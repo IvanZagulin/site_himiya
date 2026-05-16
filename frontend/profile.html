@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>МОЙ ПРОФИЛЬ - Легкая химия</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Легкая химия</h1>
+            <nav class="nav">
+                <a href="/">Главная</a>
+                <a href="/pages/profile.html" class="active">Профиль</a>
+                <a href="/pages/courses.html">Курсы</a>
+                <a href="/pages/referrals.html">Друзья</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="card">
+                <h2 style="margin-bottom: 20px; font-size: 2rem;">МОЙ ПРОФИЛЬ</h2>
+                
+                <div style="display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-start;">
+                    <!-- Фото профиля -->
+                    <div style="text-align: center;">
+                        <div id="photoContainer" style="width: 200px; height: 200px; background: #f0f0f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; border: 3px solid var(--border-color);">
+                            <span id="photoPlaceholder" style="font-size: 3rem;">📷</span>
+                            <img id="profilePhoto" src="" alt="Фото" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                        </div>
+                        <input type="file" id="photoInput" accept="image/*" style="display: none;">
+                        <button class="btn btn-secondary" style="margin-top: 10px;" onclick="document.getElementById('photoInput').click()">Загрузить фото</button>
+                    </div>
+
+                    <!-- Информация профиля -->
+                    <div style="flex: 1; min-width: 300px;">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Имя и фамилия</label>
+                            <input type="text" id="fullName" placeholder="Введите имя и фамилию" style="width: 100%;">
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Дата рождения (необязательно)</label>
+                            <input type="date" id="birthDate" style="width: 100%;">
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Класс (обязательно)</label>
+                            <select id="classNumber" style="width: 100%;">
+                                <option value="">Выберите класс</option>
+                                <option value="5">5 класс</option>
+                                <option value="6">6 класс</option>
+                                <option value="7">7 класс</option>
+                                <option value="8">8 класс</option>
+                                <option value="9">9 класс (ОГЭ)</option>
+                                <option value="10">10 класс</option>
+                                <option value="11">11 класс (ЕГЭ)</option>
+                                <option value="student">Студент (Сессия)</option>
+                            </select>
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Тип обучения</label>
+                            <div id="userType" style="padding: 10px; background: #f9f9f9; border-radius: 8px; font-size: 1.1rem;">
+                                Выберите класс для определения типа
+                            </div>
+                        </div>
+
+                        <button class="btn" onclick="saveProfile()" style="width: 100%;">Сохранить профиль</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Статус подписки и рефералы -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px;">Статус подписки</h3>
+                    <div id="subscriptionStatus" style="font-size: 1.5rem; color: #FF6B6B; font-weight: bold;">
+                        Нет подписки
+                    </div>
+                    <p style="margin-top: 10px; color: #666;">Для доступа к курсам необходимо оформить подписку</p>
+                    <button class="btn" style="margin-top: 15px; width: 100%;">Оформить подписку</button>
+                </div>
+
+                <div class="card">
+                    <h3 style="margin-bottom: 15px;">Приглашено друзей</h3>
+                    <div id="referralCount" style="font-size: 3rem; color: var(--text-color); font-weight: bold; text-align: center;">
+                        0
+                    </div>
+                    <p style="text-align: center; color: #666;">друзей присоединилось</p>
+                    <button class="btn btn-secondary" style="margin-top: 15px; width: 100%;">Пригласить друзей</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/profile.js"></script>
+</body>
+</html>
