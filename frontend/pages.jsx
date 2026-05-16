@@ -501,7 +501,7 @@ function PageLearn({ course, accent, openLesson }) {
         {topics.map((t, i) => (
           <div key={i} className="topic"
                style={{"--accent-soft": accent.soft, "--accent-d": accent.d}}
-               onClick={() => openLesson && openLesson(i + 1, t.title)}>
+               onClick={() => openLesson && openLesson(t.lesson_idx, t.title)}>
             <span className="t-num">{i+1}</span>
             <span className="t-title">{t.title}</span>
             <span className="t-status todo">{"→"}</span>
