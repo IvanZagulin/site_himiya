@@ -212,7 +212,7 @@ function lessonVideoHlsSrc(src, quality) {
   return root + "_hls/" + quality + ".m3u8";
 }
 
-function VideoPlayer({ src: videoSrc, accent, onDuration }) {
+function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
   const videoRef = React.useRef(null);
   const progressRef = React.useRef(null);
   const wrapRef = React.useRef(null);
@@ -370,6 +370,7 @@ function VideoPlayer({ src: videoSrc, accent, onDuration }) {
         background:"radial-gradient(ellipse at 30% 20%, rgba(244,197,52,0.07) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%, rgba(181,138,198,0.07) 0%,transparent 50%)"}} />
 
       <video ref={videoRef} preload="metadata" playsInline webkit-playsinline="true"
+        poster={poster || undefined}
         style={{width:"100%",height:"100%",display:"block",objectFit:"contain",zIndex:0}}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
@@ -481,6 +482,7 @@ function PageLesson({ course, lessonIndex, topicTitle, onBack, accent }) {
   const [answers, setAnswers] = React.useState({});
   const [revealed, setRevealed] = React.useState(false);
   const [videoUrl, setVideoUrl] = React.useState(null);
+  const [videoPoster, setVideoPoster] = React.useState(null);
   const [videoDurSec, setVideoDurSec] = React.useState(0);
   const [dbQuiz, setDbQuiz] = React.useState(null);
   const [docs, setDocs] = React.useState([]);
@@ -491,7 +493,7 @@ function PageLesson({ course, lessonIndex, topicTitle, onBack, accent }) {
       .then(r => r.json())
       .then(videos => {
         const v = videos.find(v => v.lesson_idx == lessonIndex);
-        if (v) setVideoUrl("/media/videos/" + v.filename);
+        if (v) { setVideoUrl("/media/videos/" + v.filename); if (v.thumbnail) setVideoPoster("/media/videos/" + v.thumbnail); }
       }).catch(() => {});
 
     fetch("/api/quizzes?course=" + c + "&lesson_idx=" + lessonIndex)
@@ -575,7 +577,7 @@ function PageLesson({ course, lessonIndex, topicTitle, onBack, accent }) {
       </div>
 
       {videoUrl ? (
-        <VideoPlayer src={videoUrl} accent={accent} onDuration={setVideoDurSec} />
+        <VideoPlayer src={videoUrl} poster={videoPoster} accent={accent} onDuration={setVideoDurSec} />
       ) : (
         <div className="video-shell" style={{"--accent": accent.c, "--accent-d": accent.d}}>
           <div className="video-play">&#9654;</div>

@@ -15,6 +15,7 @@ class Video(Base):
     is_active   = Column(Boolean, default=True, nullable=False)
     created_at  = Column(DateTime, server_default=func.now(), nullable=False)
     size_bytes  = Column(Integer, nullable=True)
+    thumbnail   = Column(String(500), nullable=True)
 
     def __repr__(self):
         return f"<Video {self.id}: {self.title}>"

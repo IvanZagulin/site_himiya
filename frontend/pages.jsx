@@ -375,7 +375,7 @@ function videoHlsSrc(src, quality) {
 }
 
 // ── Компактный плеер для списка курса ──
-function VideoPlayerInline({ src: videoSrc, accent }) {
+function VideoPlayerInline({ src: videoSrc, poster, accent }) {
   const videoRef = React.useRef(null);
   const progressRef = React.useRef(null);
   const pendingTimeRef = React.useRef(null);
@@ -492,6 +492,7 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
         background:"radial-gradient(ellipse at 30% 20%,rgba(244,197,52,0.07) 0%,transparent 50%)"}} />
 
       <video ref={videoRef} preload="metadata" playsInline webkit-playsinline="true"
+        poster={poster || undefined}
         style={{width:"100%",height:"100%",display:"block",objectFit:"contain",zIndex:0}}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
@@ -644,7 +645,7 @@ function PageLearn({ course, accent, openLesson }) {
                     {v.description}
                   </div>
                 )}
-                <VideoPlayerInline src={"/media/videos/" + v.filename} accent={accent} />
+                <VideoPlayerInline src={"/media/videos/" + v.filename} poster={v.thumbnail ? "/media/videos/" + v.thumbnail : undefined} accent={accent} />
               </div>
             ))}
           </div>

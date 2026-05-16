@@ -11,6 +11,7 @@ class VideoResponse(BaseModel):
     course: str
     lesson_idx: Optional[int]
     is_active: bool
+    thumbnail: Optional[str] = None
     created_at: datetime
     size_bytes: Optional[int]
 
