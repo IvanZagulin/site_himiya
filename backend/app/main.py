@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -22,6 +23,8 @@ from app.api.profile import router as profile_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
+mimetypes.add_type("application/vnd.apple.mpegurl", ".m3u8")
+mimetypes.add_type("video/mp2t", ".ts")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
