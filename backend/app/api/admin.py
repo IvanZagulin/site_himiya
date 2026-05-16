@@ -3,7 +3,7 @@ import subprocess
 import uuid
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -125,6 +125,11 @@ def _generate_video_qualities(path: str) -> None:
                 os.remove(tmp_path)
 
 
+def _prepare_uploaded_video(path: str) -> None:
+    _optimize_video_for_streaming(path)
+    _generate_video_qualities(path)
+
+
 # ─── Videos ────────────────────────────────────────────────────────────────
 
 @router.get("/videos", response_model=List[VideoResponse])
@@ -141,6 +146,7 @@ def list_videos(
 
 @router.post("/videos", response_model=VideoResponse)
 async def upload_video(
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     course: str = Form("main"),
     description: str = Form(""),
@@ -160,12 +166,12 @@ async def upload_video(
     path = os.path.join(settings.MEDIA_DIR, filename)
     with open(path, "wb") as f:
         f.write(content)
-    size_bytes = _optimize_video_for_streaming(path)
-    _generate_video_qualities(path)
+    size_bytes = os.path.getsize(path)
     video = Video(title=title, description=description or None,
                   filename=filename, course=course,
                   lesson_idx=lesson_idx, size_bytes=size_bytes)
     db.add(video); db.commit(); db.refresh(video)
+    background_tasks.add_task(_prepare_uploaded_video, path)
     return video
 
 
