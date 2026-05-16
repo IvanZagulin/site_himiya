@@ -21,6 +21,10 @@ rsync -a --delete \
   "$REPO_DIR/frontend/" "$WEB_DIR/"
 
 cd "$APP_DIR"
-docker compose up -d --build backend
+if command -v docker-compose >/dev/null 2>&1; then
+  docker-compose up -d --build backend
+else
+  docker compose up -d --build backend
+fi
 
 echo "Deploy complete"
