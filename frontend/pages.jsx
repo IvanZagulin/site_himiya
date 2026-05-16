@@ -370,7 +370,8 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
     const bar = progressRef.current; const v = videoRef.current;
     if (!bar || !v || !duration) return;
     const r = bar.getBoundingClientRect();
-    v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    v.currentTime = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * duration;
     e.stopPropagation();
   };
 
@@ -410,12 +411,11 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
         onEnded={() => setPlaying(false)}
         onTimeUpdate={() => { if(videoRef.current) setCurrentTime(videoRef.current.currentTime); }}
         onLoadedMetadata={() => { if(videoRef.current) setDuration(videoRef.current.duration); }}
-        onClick={togglePlay}
       />
 
       {/* Centre play */}
       {!playing && (
-        <div onClick={togglePlay} style={{
+        <div onClick={e => { e.stopPropagation(); togglePlay(); }} style={{
           position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:3,
           width:72,height:72,borderRadius:"50%",
           border:"2.5px solid rgba(255,255,255,0.9)",
@@ -431,10 +431,13 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
         position:"absolute",bottom:0,left:0,right:0,zIndex:3,
         padding:"24px 14px 10px",
         background:"linear-gradient(0deg,rgba(0,0,0,0.85) 0%,transparent 100%)",
-      }}>
+      }} onClick={e => e.stopPropagation()}>
         <div ref={progressRef} onClick={seek}
-          style={{width:"100%",height:4,background:"rgba(255,255,255,0.2)",borderRadius:99,
-            marginBottom:10,cursor:"pointer",position:"relative"}}>
+          onTouchStart={e=>{e.stopPropagation();seek(e);}}
+          onTouchMove={e=>{e.stopPropagation();seek(e);}}
+          style={{width:"100%",height:8,background:"rgba(255,255,255,0.2)",borderRadius:99,
+            marginBottom:10,cursor:"pointer",position:"relative",touchAction:"none",
+            display:"flex",alignItems:"center"}}>
           <div style={{height:"100%",borderRadius:99,
             background:"linear-gradient(90deg,"+ac+","+acd+")",
             width:pct+"%",position:"relative",transition:"width 0.1s linear"}}>

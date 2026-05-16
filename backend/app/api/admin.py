@@ -1,4 +1,5 @@
 import os
+import subprocess
 import uuid
 import logging
 from typing import List, Optional
@@ -19,12 +20,52 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"}
+FASTSTART_EXTS = {".mp4", ".m4v", ".mov"}
 ALLOWED_DOC   = {"application/pdf"}
 MAX_VIDEO     = settings.MAX_VIDEO_SIZE_MB * 1024 * 1024
 MAX_DOC       = 100 * 1024 * 1024  # 100 MB for PDFs
 
 DOCS_DIR = "/media/docs"
 TOPIC_COURSES = {"oge", "ege", "ses", "main"}
+
+
+def _optimize_video_for_streaming(path: str) -> int:
+    """Move MP4 metadata to the front so browser seeking stays responsive."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in FASTSTART_EXTS:
+        return os.path.getsize(path)
+
+    tmp_path = path + ".faststart"
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", path,
+                "-map", "0",
+                "-c", "copy",
+                "-movflags", "+faststart",
+                tmp_path,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=3600,
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.warning("ffmpeg faststart failed for %s: %s", path, result.stderr[-2000:])
+            return os.path.getsize(path)
+
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            os.replace(tmp_path, path)
+    except FileNotFoundError:
+        logger.warning("ffmpeg is not installed; uploaded video was saved without faststart optimization")
+    except Exception:
+        logger.exception("Could not optimize uploaded video for streaming: %s", path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    return os.path.getsize(path)
 
 
 # ─── Videos ────────────────────────────────────────────────────────────────
@@ -59,11 +100,13 @@ async def upload_video(
     ext = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
     filename = uuid.uuid4().hex + ext
     os.makedirs(settings.MEDIA_DIR, exist_ok=True)
-    with open(os.path.join(settings.MEDIA_DIR, filename), "wb") as f:
+    path = os.path.join(settings.MEDIA_DIR, filename)
+    with open(path, "wb") as f:
         f.write(content)
+    size_bytes = _optimize_video_for_streaming(path)
     video = Video(title=title, description=description or None,
                   filename=filename, course=course,
-                  lesson_idx=lesson_idx, size_bytes=len(content))
+                  lesson_idx=lesson_idx, size_bytes=size_bytes)
     db.add(video); db.commit(); db.refresh(video)
     return video
 
