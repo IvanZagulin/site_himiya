@@ -43,6 +43,7 @@ def _optimize_video_for_streaming(path: str) -> int:
                 "-map", "0",
                 "-c", "copy",
                 "-movflags", "+faststart",
+                "-f", "mp4",
                 tmp_path,
             ],
             stdout=subprocess.PIPE,
