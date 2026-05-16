@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"}
 FASTSTART_EXTS = {".mp4", ".m4v", ".mov"}
+VIDEO_QUALITIES = (
+    ("720p", 720, "2800k", "5600k", "24"),
+    ("480p", 480, "1200k", "2400k", "26"),
+)
 ALLOWED_DOC   = {"application/pdf"}
 MAX_VIDEO     = settings.MAX_VIDEO_SIZE_MB * 1024 * 1024
 MAX_DOC       = 100 * 1024 * 1024  # 100 MB for PDFs
@@ -69,6 +73,58 @@ def _optimize_video_for_streaming(path: str) -> int:
     return os.path.getsize(path)
 
 
+def _quality_path(path: str, quality: str) -> str:
+    root, _ = os.path.splitext(path)
+    return f"{root}_{quality}.mp4"
+
+
+def _generate_video_qualities(path: str) -> None:
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in FASTSTART_EXTS:
+        return
+
+    for quality, height, maxrate, bufsize, crf in VIDEO_QUALITIES:
+        out_path = _quality_path(path, quality)
+        tmp_path = out_path + ".tmp"
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", path,
+                    "-map", "0:v:0",
+                    "-map", "0:a?",
+                    "-vf", f"scale=-2:{height}",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-crf", crf,
+                    "-maxrate", maxrate,
+                    "-bufsize", bufsize,
+                    "-c:a", "aac",
+                    "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    "-f", "mp4",
+                    tmp_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=3600,
+                check=False,
+            )
+            if result.returncode != 0:
+                logger.warning("ffmpeg %s variant failed for %s: %s", quality, path, result.stderr[-2000:])
+                continue
+            if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+                os.replace(tmp_path, out_path)
+        except FileNotFoundError:
+            logger.warning("ffmpeg is not installed; video quality variants were not generated")
+            return
+        except Exception:
+            logger.exception("Could not generate %s variant for %s", quality, path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+
 # ─── Videos ────────────────────────────────────────────────────────────────
 
 @router.get("/videos", response_model=List[VideoResponse])
@@ -105,6 +161,7 @@ async def upload_video(
     with open(path, "wb") as f:
         f.write(content)
     size_bytes = _optimize_video_for_streaming(path)
+    _generate_video_qualities(path)
     video = Video(title=title, description=description or None,
                   filename=filename, course=course,
                   lesson_idx=lesson_idx, size_bytes=size_bytes)
@@ -130,6 +187,9 @@ def delete_video(video_id: int,
     if not video: raise HTTPException(404, "Видео не найдено")
     path = os.path.join(settings.MEDIA_DIR, video.filename)
     if os.path.exists(path): os.remove(path)
+    for quality, *_ in VIDEO_QUALITIES:
+        variant = _quality_path(path, quality)
+        if os.path.exists(variant): os.remove(variant)
     db.delete(video); db.commit()
     return {"message": "Удалено"}
 

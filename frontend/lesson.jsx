@@ -192,11 +192,26 @@ function getLesson(course, idx) {
 
 
 // ============ КАСТОМНЫЙ ВИДЕОПЛЕЕР ============
+const LESSON_VIDEO_QUALITY_OPTIONS = [
+  { id: "720p", label: "720p" },
+  { id: "480p", label: "480p" },
+  { id: "source", label: "исходное" },
+];
+
+function lessonVideoQualitySrc(src, quality) {
+  if (!src || quality === "source") return src;
+  const dot = src.lastIndexOf(".");
+  if (dot < 0) return src + "_" + quality + ".mp4";
+  return src.slice(0, dot) + "_" + quality + ".mp4";
+}
+
 function VideoPlayer({ src: videoSrc, accent, onDuration }) {
   const videoRef = React.useRef(null);
   const progressRef = React.useRef(null);
   const wrapRef = React.useRef(null);
   const hideTimer = React.useRef(null);
+  const pendingTimeRef = React.useRef(null);
+  const pendingPlayRef = React.useRef(false);
 
   const [playing, setPlaying] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
@@ -206,9 +221,11 @@ function VideoPlayer({ src: videoSrc, accent, onDuration }) {
   const [showControls, setShowControls] = React.useState(true);
   const [fullscreen, setFullscreen] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
+  const [quality, setQuality] = React.useState("720p");
 
   const ac  = accent ? accent.c : "var(--tab-yellow)";
   const acd = accent ? accent.d : "var(--tab-yellow-d)";
+  const activeSrc = lessonVideoQualitySrc(videoSrc, quality);
   const pct = duration ? (currentTime / duration) * 100 : 0;
   const fmt = s => (!s || isNaN(s)) ? "0:00"
     : Math.floor(s / 60) + ":" + Math.floor(s % 60).toString().padStart(2, "0");
@@ -251,6 +268,32 @@ function VideoPlayer({ src: videoSrc, accent, onDuration }) {
     e.stopPropagation();
   };
 
+  const changeQuality = (nextQuality, e) => {
+    if (e) e.stopPropagation();
+    const v = videoRef.current;
+    if (v) {
+      pendingTimeRef.current = v.currentTime || 0;
+      pendingPlayRef.current = !v.paused;
+    }
+    setQuality(nextQuality);
+  };
+
+  const onMetadata = () => {
+    const v = videoRef.current; if (!v) return;
+    const d = v.duration;
+    setDuration(d); setLoaded(true); if(onDuration)onDuration(d);
+    if (pendingTimeRef.current != null) {
+      v.currentTime = Math.min(pendingTimeRef.current, d || pendingTimeRef.current);
+      pendingTimeRef.current = null;
+      if (pendingPlayRef.current) v.play().catch(() => {});
+      pendingPlayRef.current = false;
+    }
+  };
+
+  const onVideoError = () => {
+    if (quality !== "source") setQuality("source");
+  };
+
   const resetHide = () => {
     setShowControls(true);
     clearTimeout(hideTimer.current);
@@ -291,13 +334,14 @@ function VideoPlayer({ src: videoSrc, accent, onDuration }) {
       <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,
         background:"radial-gradient(ellipse at 30% 20%, rgba(244,197,52,0.07) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%, rgba(181,138,198,0.07) 0%,transparent 50%)"}} />
 
-      <video ref={videoRef} src={videoSrc} preload="auto" playsInline webkit-playsinline="true"
+      <video ref={videoRef} src={activeSrc} preload="metadata" playsInline webkit-playsinline="true"
         style={{width:"100%",height:"100%",display:"block",objectFit:"contain",zIndex:0}}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onTimeUpdate={() => { if(videoRef.current) setCurrentTime(videoRef.current.currentTime); }}
-        onLoadedMetadata={() => { if(videoRef.current){const d=videoRef.current.duration;setDuration(d);setLoaded(true);if(onDuration)onDuration(d);} }}
+        onLoadedMetadata={onMetadata}
+        onError={onVideoError}
       />
 
       {/* Centre play button */}
@@ -365,6 +409,22 @@ function VideoPlayer({ src: videoSrc, accent, onDuration }) {
           </span>
 
           <div style={{flex:1}} />
+
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            {LESSON_VIDEO_QUALITY_OPTIONS.map(q => (
+              <button key={q.id} onClick={e=>changeQuality(q.id,e)}
+                style={{
+                  border:"1px solid rgba(255,255,255,0.35)",
+                  background:quality===q.id?ac:"rgba(0,0,0,0.28)",
+                  color:quality===q.id?"var(--ink)":"rgba(255,255,255,0.82)",
+                  borderRadius:999,
+                  padding:"4px 8px",
+                  fontSize:12,
+                  fontWeight:700,
+                  cursor:"pointer",
+                }}>{q.label}</button>
+            ))}
+          </div>
 
           <button onClick={toggleFS} style={btnBase} title="Полный экран">
             {fullscreen ? "✕" : "⛶"}

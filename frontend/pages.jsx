@@ -344,19 +344,36 @@ function KPI({ num, label, tinted, accent }) {
 
 // ============ ОБУЧЕНИЕ ============
 
+const VIDEO_QUALITY_OPTIONS = [
+  { id: "720p", label: "720p" },
+  { id: "480p", label: "480p" },
+  { id: "source", label: "исходное" },
+];
+
+function videoQualitySrc(src, quality) {
+  if (!src || quality === "source") return src;
+  const dot = src.lastIndexOf(".");
+  if (dot < 0) return src + "_" + quality + ".mp4";
+  return src.slice(0, dot) + "_" + quality + ".mp4";
+}
+
 // ── Компактный плеер для списка курса ──
 function VideoPlayerInline({ src: videoSrc, accent }) {
   const videoRef = React.useRef(null);
   const progressRef = React.useRef(null);
+  const pendingTimeRef = React.useRef(null);
+  const pendingPlayRef = React.useRef(false);
 
   const [playing, setPlaying] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
   const [volume, setVolume] = React.useState(1);
   const [muted, setMuted] = React.useState(false);
+  const [quality, setQuality] = React.useState("720p");
 
   const ac  = accent ? accent.c : "var(--tab-yellow)";
   const acd = accent ? accent.d : "var(--tab-yellow-d)";
+  const activeSrc = videoQualitySrc(videoSrc, quality);
   const pct = duration ? (currentTime / duration) * 100 : 0;
   const fmt = s => (!s || isNaN(s)) ? "0:00"
     : Math.floor(s / 60) + ":" + Math.floor(s % 60).toString().padStart(2, "0");
@@ -388,6 +405,31 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
     e.stopPropagation();
   };
 
+  const changeQuality = (nextQuality, e) => {
+    if (e) e.stopPropagation();
+    const v = videoRef.current;
+    if (v) {
+      pendingTimeRef.current = v.currentTime || 0;
+      pendingPlayRef.current = !v.paused;
+    }
+    setQuality(nextQuality);
+  };
+
+  const onMetadata = () => {
+    const v = videoRef.current; if (!v) return;
+    setDuration(v.duration);
+    if (pendingTimeRef.current != null) {
+      v.currentTime = Math.min(pendingTimeRef.current, v.duration || pendingTimeRef.current);
+      pendingTimeRef.current = null;
+      if (pendingPlayRef.current) v.play().catch(() => {});
+      pendingPlayRef.current = false;
+    }
+  };
+
+  const onVideoError = () => {
+    if (quality !== "source") setQuality("source");
+  };
+
   const btnBase = {
     background:"none",border:"none",color:"rgba(255,255,255,0.8)",
     cursor:"pointer",padding:"3px 5px",fontSize:16,lineHeight:1,
@@ -404,13 +446,14 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
       <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,
         background:"radial-gradient(ellipse at 30% 20%,rgba(244,197,52,0.07) 0%,transparent 50%)"}} />
 
-      <video ref={videoRef} src={videoSrc} preload="auto" playsInline webkit-playsinline="true"
+      <video ref={videoRef} src={activeSrc} preload="metadata" playsInline webkit-playsinline="true"
         style={{width:"100%",height:"100%",display:"block",objectFit:"contain",zIndex:0}}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onTimeUpdate={() => { if(videoRef.current) setCurrentTime(videoRef.current.currentTime); }}
-        onLoadedMetadata={() => { if(videoRef.current) setDuration(videoRef.current.duration); }}
+        onLoadedMetadata={onMetadata}
+        onError={onVideoError}
       />
 
       {/* Centre play */}
@@ -468,6 +511,24 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
             fontVariantNumeric:"tabular-nums",letterSpacing:"0.02em"}}>
             {fmt(currentTime)} / {fmt(duration)}
           </span>
+
+          <div style={{flex:1}} />
+
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            {VIDEO_QUALITY_OPTIONS.map(q => (
+              <button key={q.id} onClick={e=>changeQuality(q.id,e)}
+                style={{
+                  border:"1px solid rgba(255,255,255,0.35)",
+                  background:quality===q.id?ac:"rgba(0,0,0,0.28)",
+                  color:quality===q.id?"var(--ink)":"rgba(255,255,255,0.82)",
+                  borderRadius:999,
+                  padding:"3px 7px",
+                  fontSize:11,
+                  fontWeight:700,
+                  cursor:"pointer",
+                }}>{q.label}</button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
