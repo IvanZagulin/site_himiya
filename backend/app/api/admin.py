@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import uuid
 import logging
@@ -78,6 +79,11 @@ def _quality_path(path: str, quality: str) -> str:
     return f"{root}_{quality}.mp4"
 
 
+def _hls_dir(path: str) -> str:
+    root, _ = os.path.splitext(path)
+    return f"{root}_hls"
+
+
 def _generate_video_qualities(path: str) -> None:
     ext = os.path.splitext(path)[1].lower()
     if ext not in FASTSTART_EXTS:
@@ -125,9 +131,68 @@ def _generate_video_qualities(path: str) -> None:
                 os.remove(tmp_path)
 
 
+def _generate_hls(path: str) -> None:
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in FASTSTART_EXTS:
+        return
+
+    hls_dir = _hls_dir(path)
+    os.makedirs(hls_dir, exist_ok=True)
+    variants = []
+
+    for quality, height, maxrate, bufsize, crf in VIDEO_QUALITIES:
+        playlist = os.path.join(hls_dir, f"{quality}.m3u8")
+        segment_pattern = os.path.join(hls_dir, f"{quality}_%03d.ts")
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", path,
+                    "-map", "0:v:0",
+                    "-map", "0:a?",
+                    "-vf", f"scale=-2:{height}",
+                    "-c:v", "libx264",
+                    "-preset", "veryfast",
+                    "-crf", crf,
+                    "-maxrate", maxrate,
+                    "-bufsize", bufsize,
+                    "-c:a", "aac",
+                    "-b:a", "128k",
+                    "-hls_time", "4",
+                    "-hls_playlist_type", "vod",
+                    "-hls_segment_filename", segment_pattern,
+                    playlist,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=3600,
+                check=False,
+            )
+            if result.returncode != 0:
+                logger.warning("ffmpeg %s HLS failed for %s: %s", quality, path, result.stderr[-2000:])
+                continue
+            if os.path.exists(playlist):
+                variants.append((quality, height, maxrate))
+        except FileNotFoundError:
+            logger.warning("ffmpeg is not installed; HLS variants were not generated")
+            return
+        except Exception:
+            logger.exception("Could not generate %s HLS for %s", quality, path)
+
+    if variants:
+        master = os.path.join(hls_dir, "master.m3u8")
+        with open(master, "w", encoding="utf-8") as f:
+            f.write("#EXTM3U\n#EXT-X-VERSION:3\n")
+            for quality, height, maxrate in variants:
+                bandwidth = int(maxrate.rstrip("k")) * 1000
+                f.write(f"#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},RESOLUTION={height * 16 // 9}x{height}\n")
+                f.write(f"{quality}.m3u8\n")
+
+
 def _prepare_uploaded_video(path: str) -> None:
     _optimize_video_for_streaming(path)
     _generate_video_qualities(path)
+    _generate_hls(path)
 
 
 # ─── Videos ────────────────────────────────────────────────────────────────
@@ -196,6 +261,8 @@ def delete_video(video_id: int,
     for quality, *_ in VIDEO_QUALITIES:
         variant = _quality_path(path, quality)
         if os.path.exists(variant): os.remove(variant)
+    hls_dir = _hls_dir(path)
+    if os.path.exists(hls_dir): shutil.rmtree(hls_dir)
     db.delete(video); db.commit()
     return {"message": "Удалено"}
 

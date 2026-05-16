@@ -357,6 +357,13 @@ function videoQualitySrc(src, quality) {
   return src.slice(0, dot) + "_" + quality + ".mp4";
 }
 
+function videoHlsSrc(src, quality) {
+  if (!src || quality === "source") return null;
+  const dot = src.lastIndexOf(".");
+  const root = dot < 0 ? src : src.slice(0, dot);
+  return root + "_hls/" + quality + ".m3u8";
+}
+
 // ── Компактный плеер для списка курса ──
 function VideoPlayerInline({ src: videoSrc, accent }) {
   const videoRef = React.useRef(null);
@@ -374,6 +381,7 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
   const ac  = accent ? accent.c : "var(--tab-yellow)";
   const acd = accent ? accent.d : "var(--tab-yellow-d)";
   const activeSrc = videoQualitySrc(videoSrc, quality);
+  const activeHlsSrc = videoHlsSrc(videoSrc, quality);
   const pct = duration ? (currentTime / duration) * 100 : 0;
   const fmt = s => (!s || isNaN(s)) ? "0:00"
     : Math.floor(s / 60) + ":" + Math.floor(s % 60).toString().padStart(2, "0");
@@ -430,6 +438,33 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
     if (quality !== "source") setQuality("source");
   };
 
+  React.useEffect(() => {
+    const v = videoRef.current; if (!v) return;
+    let hls = null;
+    const fallback = () => {
+      if (v.src !== activeSrc) v.src = activeSrc;
+    };
+
+    if (activeHlsSrc && v.canPlayType("application/vnd.apple.mpegurl")) {
+      v.src = activeHlsSrc;
+    } else if (activeHlsSrc && window.Hls && window.Hls.isSupported()) {
+      hls = new window.Hls({ maxBufferLength: 12, backBufferLength: 12 });
+      hls.on(window.Hls.Events.ERROR, function(_, data) {
+        if (data && data.fatal) {
+          hls.destroy();
+          hls = null;
+          fallback();
+        }
+      });
+      hls.loadSource(activeHlsSrc);
+      hls.attachMedia(v);
+    } else {
+      fallback();
+    }
+
+    return () => { if (hls) hls.destroy(); };
+  }, [activeHlsSrc, activeSrc]);
+
   const btnBase = {
     background:"none",border:"none",color:"rgba(255,255,255,0.8)",
     cursor:"pointer",padding:"3px 5px",fontSize:16,lineHeight:1,
@@ -446,7 +481,7 @@ function VideoPlayerInline({ src: videoSrc, accent }) {
       <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,
         background:"radial-gradient(ellipse at 30% 20%,rgba(244,197,52,0.07) 0%,transparent 50%)"}} />
 
-      <video ref={videoRef} src={activeSrc} preload="metadata" playsInline webkit-playsinline="true"
+      <video ref={videoRef} preload="metadata" playsInline webkit-playsinline="true"
         style={{width:"100%",height:"100%",display:"block",objectFit:"contain",zIndex:0}}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
