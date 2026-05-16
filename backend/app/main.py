@@ -14,11 +14,13 @@ from app.models.user import User
 from app.models.video import Video
 from app.models.topic import Topic
 from app.models.quiz import Quiz, Question, QuizAttempt, LessonDoc
+from app.models.schedule import ScheduleEvent
 from app.database import Base
 from app.api import auth, admin, videos_public
 from app.api import quiz as quiz_api
 from app.api import docs_public
 from app.api import topics_public
+from app.api import schedule_public
 from app.api.profile import router as profile_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -105,6 +107,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(videos_public.router, prefix="/api", tags=["videos"])
 app.include_router(quiz_api.router, prefix="/api", tags=["quiz"])
 app.include_router(topics_public.router, prefix="/api", tags=["topics"])
+app.include_router(schedule_public.router, prefix="/api", tags=["schedule"])
 app.include_router(docs_public.router, prefix="/api", tags=["docs"])
 app.include_router(profile_router, prefix="/api/profile", tags=["profile"])
 

@@ -605,6 +605,8 @@ input, select, textarea { font-family: inherit; color: inherit; }
   box-shadow: 0 2px 0 rgba(68,45,29,0.08);
   cursor: pointer;
   transition: transform 100ms ease;
+  box-sizing: border-box;
+  text-align: left;
 }
 .sched-event:hover { transform: translate(-1px, -1px); }
 .sched-event .ev-time {
@@ -627,6 +629,51 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .ev--oge { background: #E9D6F0; border-color: var(--tab-purple-d); }
 .ev--ege { background: #D6E8F0; border-color: var(--tab-blue-d); }
 .ev--ses { background: #DCEED5; border-color: var(--tab-green-d); }
+
+.schedule-empty {
+  position: absolute;
+  left: 80px;
+  right: 20px;
+  top: 48px;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--rule);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: rgba(255, 247, 226, 0.88);
+  font-family: "Soyuz Grotesk", sans-serif;
+  font-size: 13px;
+}
+.schedule-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.schedule-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 4px 2px;
+  color: var(--ink);
+  font-family: "Soyuz Grotesk", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.schedule-filter.active {
+  opacity: 1;
+}
+.schedule-dot {
+  width: 16px;
+  height: 16px;
+  border: 2px solid;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
 
 /* ====== Cards / topic lists (Обучение) ====== */
 .cards-row {

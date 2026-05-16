@@ -181,35 +181,38 @@ function PageProfile({ profile, setProfile, course, accent, onLogout }) {
 // ============ РАСПИСАНИЕ ВЕБИНАРОВ ============
 function PageSchedule({ course, accent, openLesson }) {
   const [weekOffset, setWeekOffset] = useState(0);
-  // Sample events keyed by course
-  const allEvents = {
-    oge: [
-      { day: 0, start: 11.5, end: 15.0, num: 1, title: "ОГЭ · Занятие 1", topic: "Строение атома", type: "oge" },
-      { day: 3, start: 12.0, end: 15.0, num: 2, title: "ОГЭ · Занятие 2", topic: "Химическая связь", type: "oge" },
-    ],
-    ege: [
-      { day: 2, start: 15.5, end: 18.5, num: 5, title: "ЕГЭ · Занятие 5", topic: "Оксиды и гидроксиды", type: "ege" },
-      { day: 5, start: 10.0, end: 13.0, num: 6, title: "ЕГЭ · Занятие 6", topic: "Кислоты", type: "ege" },
-    ],
-    ses: [
-      { day: 1, start: 18.0, end: 20.0, num: 3, title: "Сессия · Занятие 3", topic: "Растворы", type: "ses" },
-      { day: 4, start: 19.0, end: 21.0, num: 4, title: "Сессия · Занятие 4", topic: "Буферные системы", type: "ses" },
-    ],
-  };
-  // Show both course-specific + cross-course events for richness
-  const events = [
-    ...allEvents.oge,
-    ...allEvents.ege,
-    ...allEvents.ses,
-  ];
+  const defaultFilter = course === "main" ? "oge" : course;
+  const [filter, setFilter] = useState(defaultFilter);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    setFilter(course === "main" ? "oge" : course);
+  }, [course]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/schedule")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (!cancelled) setEvents(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setEvents([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleEvents = events.filter(ev => ev.course === filter);
   const days = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"];
   const hours = [];
   for (let h = 7; h <= 21; h++) hours.push(h);
   const ROW_H = 44;
   const HOUR_START = 7;
+  const COURSES = [
+    { id: "oge", label: "ОГЭ", swatch: "ev--oge" },
+    { id: "ege", label: "ЕГЭ", swatch: "ev--ege" },
+    { id: "ses", label: "Сессия", swatch: "ev--ses" },
+  ];
 
-  // Compute week label
   const baseStart = new Date(2026, 4, 4); // Mon 4 May 2026
   const ws = new Date(baseStart); ws.setDate(ws.getDate() + weekOffset * 7);
   const we = new Date(ws); we.setDate(we.getDate() + 6);
@@ -238,56 +241,63 @@ function PageSchedule({ course, accent, openLesson }) {
             </React.Fragment>
           ))}
 
-          {events.map((ev, i) => {
-            const top = (ev.start - HOUR_START) * ROW_H;
-            const height = (ev.end - ev.start) * ROW_H - 4;
+          {visibleEvents.map((ev) => {
+            const start = timeToHours(ev.start_time);
+            const end = timeToHours(ev.end_time);
+            const top = (start - HOUR_START) * ROW_H;
+            const height = Math.max((end - start) * ROW_H - 6, 36);
             const colWidth = `calc((100% - 60px) / 7)`;
-            const left = `calc(60px + ${ev.day} * ${colWidth} + 4px)`;
+            const left = `calc(60px + ${ev.weekday} * ${colWidth} + 4px)`;
             const width = `calc(${colWidth} - 8px)`;
-            const dim = ev.type !== course ? 0.45 : 1;
             return (
-              <div key={i}
-                className={`sched-event ev--${ev.type}`}
-                style={{
-                  top: top + 4, height,
-                  left, width,
-                  opacity: dim,
-                }}
+              <button key={ev.id}
+                type="button"
+                className={`sched-event ev--${ev.course}`}
+                style={{ top: top + 4, height, left, width }}
                 title={`${ev.title} — открыть урок`}
-                onClick={() => openLesson && openLesson(ev.num, ev.topic, ev.type)}>
-                <div className="ev-time">{tt(ev.start)}–{tt(ev.end)}</div>
+                onClick={() => openLesson && openLesson(ev.lesson_idx, ev.topic, ev.course)}>
+                <div className="ev-time">{ev.start_time}–{ev.end_time}</div>
                 <div className="ev-title">{ev.title}</div>
                 <div className="ev-topic">«{ev.topic}»</div>
-              </div>
+              </button>
             );
           })}
+
+          {!loading && visibleEvents.length === 0 && (
+            <div className="schedule-empty">В этом разделе расписание пока не добавлено</div>
+          )}
         </div>
       </div>
 
-      <div className="row" style={{marginTop: 18, gap: 16, flexWrap: "wrap"}}>
-        <Legend swatch="ev--oge" label="ОГЭ" />
-        <Legend swatch="ev--ege" label="ЕГЭ" />
-        <Legend swatch="ev--ses" label="Сессия" />
-        <span className="muted" style={{fontSize: 13}}>Текущая вкладка выделена ярче · остальные курсы приглушены</span>
+      <div className="schedule-filter-row" aria-label="Фильтр расписания">
+        {COURSES.map(c => (
+          <Legend
+            key={c.id}
+            swatch={c.swatch}
+            label={c.label}
+            active={filter === c.id}
+            onClick={() => setFilter(c.id)}
+          />
+        ))}
+        <span className="muted" style={{fontSize: 13}}>Нажмите на раздел, чтобы оставить только его занятия</span>
       </div>
     </div>
   );
 }
 
-function tt(v) {
-  const h = Math.floor(v); const m = Math.round((v - h) * 60);
-  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+function timeToHours(value) {
+  const [h, m] = String(value || "00:00").split(":").map(n => parseInt(n, 10) || 0);
+  return h + m / 60;
 }
 
-function Legend({ swatch, label }) {
+function Legend({ swatch, label, active, onClick }) {
   return (
-    <span className="row" style={{gap: 6, fontSize: 13, fontWeight: 600}}>
-      <span className={`sched-event ${swatch}`} style={{position: "static", width: 16, height: 16, padding: 0, borderWidth: 2}}></span>
+    <button type="button" className={`schedule-filter ${active ? "active" : ""}`} onClick={onClick}>
+      <span className={`schedule-dot ${swatch}`}></span>
       {label}
-    </span>
+    </button>
   );
 }
-
 // ============ МОЙ РЕЙТИНГ ============
 function PageRating({ course, accent }) {
   const data = [

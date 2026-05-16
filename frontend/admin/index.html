@@ -676,18 +676,20 @@ function selectLesson(topicId) {
     apiFetch('/admin/videos?course=' + _topicCourse),
     apiFetch('/admin/docs?course=' + _topicCourse),
     apiFetch('/admin/quizzes'),
-  ]).then(async ([vRes, dRes, qRes]) => {
-    let vList = [], dList = [], qList = [];
+    apiFetch('/admin/schedule?course=' + _topicCourse + '&lesson_idx=' + idx),
+  ]).then(async ([vRes, dRes, qRes, sRes]) => {
+    let vList = [], dList = [], qList = [], sList = [];
     if (vRes && vRes.ok) vList = (await vRes.json()).filter(v => v.lesson_idx == idx);
     if (dRes && dRes.ok) dList = (await dRes.json()).filter(d => d.lesson_idx == idx);
     if (qRes && qRes.ok) qList = (await qRes.json()).filter(q => q.course === _topicCourse && q.lesson_idx == idx);
-    panel.innerHTML = renderContentPanel(idx, title, vList, dList, qList);
+    if (sRes && sRes.ok) sList = await sRes.json();
+    panel.innerHTML = renderContentPanel(idx, title, vList, dList, qList, sList);
   }).catch(() => {
     panel.innerHTML = '<div style="color:var(--red);padding:12px;">Ошибка загрузки данных</div>';
   });
 }
 
-function renderContentPanel(idx, title, vList, dList, qList) {
+function renderContentPanel(idx, title, vList, dList, qList, sList) {
   const safeTitle = escapeHtml(title);
   return `
   <div style="border-top:2px solid var(--green);padding-top:16px;">
@@ -766,6 +768,34 @@ function renderContentPanel(idx, title, vList, dList, qList) {
         </div>
       </div>
 
+    </div>
+    <div class="lp-upload-box" style="margin-top:16px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;">День урока в календаре</div>
+      <div id="lp-schedule-list-${idx}" style="margin-bottom:10px;">${buildLpSchedule(sList, idx)}</div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.4fr auto;gap:8px;align-items:end;">
+        <label style="font-size:12px;font-weight:600;">День
+          <select id="lp-sday-${idx}" style="width:100%;margin-top:4px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;">
+            <option value="0">Понедельник</option>
+            <option value="1">Вторник</option>
+            <option value="2">Среда</option>
+            <option value="3">Четверг</option>
+            <option value="4">Пятница</option>
+            <option value="5">Суббота</option>
+            <option value="6">Воскресенье</option>
+          </select>
+        </label>
+        <label style="font-size:12px;font-weight:600;">Начало
+          <input id="lp-sstart-${idx}" type="time" value="11:00" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;" />
+        </label>
+        <label style="font-size:12px;font-weight:600;">Конец
+          <input id="lp-send-${idx}" type="time" value="12:30" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;" />
+        </label>
+        <label style="font-size:12px;font-weight:600;">Заголовок
+          <input id="lp-stitle-${idx}" type="text" placeholder="${escapeHtml((_topicCourse || '').toUpperCase())} · занятие ${idx}" style="width:100%;box-sizing:border-box;margin-top:4px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;" />
+        </label>
+        <button class="btn btn-primary btn-sm" onclick="lpAddSchedule(${idx})">Добавить</button>
+      </div>
+      <div id="lp-salert-${idx}" style="font-size:12px;margin-top:6px;"></div>
     </div>
   </div>`;
 }
@@ -857,6 +887,52 @@ function buildLpQuizzes(quizzes, idx) {
           </div>`).join('') : '<div style="color:var(--muted);font-size:12px;padding:4px 0;">Вопросов нет</div>'}
       </div>
     </div>`).join('');
+}
+
+const WEEKDAY_LABELS = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
+
+function buildLpSchedule(events, idx) {
+  if (!events || !events.length) return '<div class="lp-empty">В календаре пока нет</div>';
+  return events.map(ev => `
+    <div class="lp-item">
+      <div style="flex:1;min-width:0;">
+        <div class="lp-item-name">${WEEKDAY_LABELS[ev.weekday] || '—'} · ${ev.start_time}–${ev.end_time} · ${escapeHtml(ev.title)}</div>
+        <div class="lp-item-meta">Переход ведёт на урок ${ev.lesson_idx}: ${escapeHtml(ev.topic)}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="lpDeleteSchedule(${ev.id},${idx})">✕</button>
+    </div>`).join('');
+}
+
+async function lpAddSchedule(idx) {
+  const alertEl = document.getElementById('lp-salert-'+idx);
+  alertEl.textContent = '';
+  const topic = (_topicsList.find(t => t.lesson_idx == idx) || {}).title || ('Урок ' + idx);
+  const payload = {
+    course: _topicCourse,
+    lesson_idx: idx,
+    weekday: parseInt(document.getElementById('lp-sday-'+idx).value, 10),
+    start_time: document.getElementById('lp-sstart-'+idx).value,
+    end_time: document.getElementById('lp-send-'+idx).value,
+    title: document.getElementById('lp-stitle-'+idx).value.trim() || (COURSE_LABELS[_topicCourse] + ' · занятие ' + idx),
+    topic
+  };
+  const res = await apiFetch('/admin/schedule', {method:'POST', body:JSON.stringify(payload)});
+  if (res && res.ok) {
+    alertEl.textContent = 'Добавлено в календарь'; alertEl.style.color = '#2e7d32';
+    document.getElementById('lp-stitle-'+idx).value = '';
+    setTimeout(() => { alertEl.textContent = ''; }, 2500);
+    lpReloadLesson(idx);
+  } else {
+    let msg = 'Не удалось добавить';
+    try { const err = res ? await res.json() : null; if (err && err.detail) msg = err.detail; } catch(e) {}
+    alertEl.textContent = msg; alertEl.style.color = '#c62828';
+  }
+}
+
+async function lpDeleteSchedule(eventId, idx) {
+  if (!confirm('Удалить урок из календаря? Материалы урока останутся.')) return;
+  await apiFetch('/admin/schedule/' + eventId, { method: 'DELETE' });
+  lpReloadLesson(idx);
 }
 
 function toggleTopicRow(idx) {
@@ -1122,6 +1198,15 @@ async function lpReloadLesson(idx) {
       if (qListEl) qListEl.innerHTML = buildLpQuizzes(qList, idx);
     }
   } catch(e) { console.error('quizzes reload error', e); }
+
+  try {
+    const sRes = await apiFetch('/admin/schedule?course=' + _topicCourse + '&lesson_idx=' + idx);
+    if (sRes && sRes.ok) {
+      const sList = await sRes.json();
+      const sListEl = document.getElementById('lp-schedule-list-'+idx);
+      if (sListEl) sListEl.innerHTML = buildLpSchedule(sList, idx);
+    }
+  } catch(e) { console.error('schedule reload error', e); }
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('login-screen').classList.contains('hidden'))doLogin();});

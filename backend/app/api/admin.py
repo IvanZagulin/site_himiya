@@ -12,10 +12,12 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.models.video import Video
+from app.models.schedule import ScheduleEvent
 from app.models.quiz import Quiz, Question, QuizAttempt, LessonDoc
 from app.schemas.video import VideoResponse, VideoUpdate
 from app.schemas.quiz import QuizCreate, QuizOut, QuestionIn, QuestionOut, DocOut
 from app.api.auth import get_admin_user
+from app.api.schedule_public import schedule_event_out
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ MAX_DOC       = 100 * 1024 * 1024  # 100 MB for PDFs
 
 DOCS_DIR = "/media/docs"
 TOPIC_COURSES = {"oge", "ege", "ses", "main"}
+WEEKDAYS = set(range(7))
 
 
 def _optimize_video_for_streaming(path: str) -> int:
@@ -507,3 +510,89 @@ def reorder_topics(
         db.query(Topic).filter(Topic.id == tid).update({"order_num": pos})
     db.commit()
     return {"ok": True}
+
+
+# ─── Schedule ───────────────────────────────────────────────────────────────
+
+def _normalize_time(value: str) -> str:
+    value = str(value or "").strip()
+    parts = value.split(":")
+    if len(parts) != 2:
+        raise HTTPException(400, "Время должно быть в формате HH:MM")
+    try:
+        h, m = int(parts[0]), int(parts[1])
+    except ValueError:
+        raise HTTPException(400, "Время должно быть в формате HH:MM")
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        raise HTTPException(400, "Некорректное время")
+    return f"{h:02d}:{m:02d}"
+
+
+@router.get("/schedule")
+def list_schedule(
+    course: Optional[str] = None,
+    lesson_idx: Optional[int] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    q = db.query(ScheduleEvent)
+    if course:
+        q = q.filter(ScheduleEvent.course == course)
+    if lesson_idx is not None:
+        q = q.filter(ScheduleEvent.lesson_idx == lesson_idx)
+    events = q.order_by(ScheduleEvent.weekday, ScheduleEvent.start_time, ScheduleEvent.id).all()
+    return [schedule_event_out(ev) for ev in events]
+
+
+@router.post("/schedule", status_code=201)
+def create_schedule_event(
+    data: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    course = str(data.get("course", "oge")).strip().lower()
+    if course not in TOPIC_COURSES:
+        raise HTTPException(400, "Неизвестный раздел")
+    lesson_idx = int(data.get("lesson_idx") or 0)
+    if lesson_idx <= 0:
+        raise HTTPException(400, "Укажите урок")
+    try:
+        weekday = int(data.get("weekday"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Некорректный день недели")
+    if weekday not in WEEKDAYS:
+        raise HTTPException(400, "Некорректный день недели")
+    start_time = _normalize_time(data.get("start_time"))
+    end_time = _normalize_time(data.get("end_time"))
+    if end_time <= start_time:
+        raise HTTPException(400, "Конец занятия должен быть позже начала")
+
+    topic = db.query(Topic).filter(Topic.course == course, Topic.lesson_idx == lesson_idx).first()
+    default_topic = topic.title if topic else f"Урок {lesson_idx}"
+    title = str(data.get("title") or f"{course.upper()} · занятие {lesson_idx}").strip()
+    topic_title = str(data.get("topic") or default_topic).strip()
+
+    ev = ScheduleEvent(
+        course=course,
+        lesson_idx=lesson_idx,
+        title=title,
+        topic=topic_title,
+        weekday=weekday,
+        start_time=start_time,
+        end_time=end_time,
+        is_active=data.get("is_active", True) is not False,
+    )
+    db.add(ev); db.commit(); db.refresh(ev)
+    return schedule_event_out(ev)
+
+
+@router.delete("/schedule/{event_id}", status_code=204)
+def delete_schedule_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    ev = db.query(ScheduleEvent).filter(ScheduleEvent.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Не найдено")
+    db.delete(ev); db.commit()
