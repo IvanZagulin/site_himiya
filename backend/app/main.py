@@ -37,21 +37,28 @@ def _create_tables():
 
 
 def _ensure_user_profile_columns():
-    columns = {c["name"] for c in inspect(engine).get_columns("users")}
-    statements = {
-        "first_name": "ALTER TABLE users ADD COLUMN first_name VARCHAR(100)",
-        "last_name": "ALTER TABLE users ADD COLUMN last_name VARCHAR(100)",
-        "dob": "ALTER TABLE users ADD COLUMN dob VARCHAR(20)",
-        "grade": "ALTER TABLE users ADD COLUMN grade VARCHAR(50) DEFAULT '11 класс'",
-        "study_type": "ALTER TABLE users ADD COLUMN study_type VARCHAR(20) DEFAULT 'school'",
-        "subscription": "ALTER TABLE users ADD COLUMN subscription VARCHAR(20) DEFAULT 'none'",
-        "invited_count": "ALTER TABLE users ADD COLUMN invited_count INTEGER NOT NULL DEFAULT 0",
-        "photo_url": "ALTER TABLE users ADD COLUMN photo_url TEXT",
-    }
-    with engine.begin() as conn:
-        for name, statement in statements.items():
-            if name not in columns:
+    statements = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS dob VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS grade VARCHAR(50) DEFAULT '11 класс'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS study_type VARCHAR(20) DEFAULT 'school'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription VARCHAR(20) DEFAULT 'none'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT",
+    ]
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            for statement in statements:
                 conn.execute(text(statement))
+        return
+
+    columns = {c["name"] for c in inspect(engine).get_columns("users")}
+    with engine.begin() as conn:
+        for statement in statements:
+            name = statement.split(" IF NOT EXISTS ")[1].split()[0]
+            if name not in columns:
+                conn.execute(text(statement.replace(" IF NOT EXISTS", "")))
 
 
 def _ensure_admin():
