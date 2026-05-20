@@ -411,7 +411,7 @@ function KPI({ num, label, tinted, accent }) {
   );
 }
 
-// ============ ОБУЧЕНИЕ ============
+// ============ МАТЕРИАЛЫ КУРСА ============
 
 const VIDEO_QUALITY_OPTIONS = [
   { id: "auto", label: "авто" },
