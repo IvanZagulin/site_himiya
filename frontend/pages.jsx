@@ -1,33 +1,72 @@
-/* global React */
+﻿/* global React */
 const { useState, useEffect, useRef } = React;
 
-// ============ ГЛАВНАЯ ============
-function PageHome({ course, setCourse, setSection, accent }) {
+// ============ ПЕРЕКЛЮЧАТЕЛЬ ТЕМ ============
+function ThemeSwitcher({ theme, setTheme }) {
+  const fonts = [
+    { id: 'inter',   label: 'Inter',     stack: "'Inter', sans-serif" },
+    { id: 'nunito',  label: 'Nunito',    stack: "'Nunito', sans-serif" },
+    { id: 'raleway', label: 'Raleway',   stack: "'Raleway', sans-serif" },
+    { id: 'ibmplex', label: 'IBM Plex',  stack: "'IBM Plex Sans', sans-serif" },
+  ];
+  const bgs = [
+    { id: 'ivory',     label: 'Слоновая кость', color: '#F5F0E8' },
+    { id: 'milk',      label: 'Молочный',        color: '#F0EDE6' },
+    { id: 'linen',     label: 'Лён',             color: '#FAF0E6' },
+    { id: 'cream',     label: 'Крем',            color: '#FCECCF' },
+    { id: 'parchment', label: 'Пергамент',       color: '#EDE4D0' },
+  ];
   return (
-    <div>
-      <div className="hero">
-        <div>
-          <div className="tiny muted" style={{marginBottom: 16}}>Онлайн-школа по химии</div>
-          <h1>С нуля<span style={{color: accent.d}}>.</span></h1>
-          <p className="sub">
-            Подготовка к ОГЭ, ЕГЭ и сессии по химии — в формате папки с конспектами,
-            вебинарами и заданиями. Выбери папку сверху и начинай готовиться к экзамену.
-          </p>
-          <div className="cta-row">
-            <button className="btn btn--filled" onClick={() => setSection("learn")}>Начать обучение</button>
-            <button className="btn" onClick={() => setSection("schedule")}>Расписание вебинаров</button>
-          </div>
+    <div className="theme-switcher">
+      <div className="ts-section-label">Шрифт</div>
+      <div className="ts-row">
+        {fonts.map(f => (
+          <button key={f.id}
+            className={`ts-font-btn${theme.font === f.id ? ' ts-font-btn--on' : ''}`}
+            style={{fontFamily: f.stack}}
+            onClick={() => setTheme({...theme, font: f.id})}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className="ts-section-label" style={{marginTop: 14}}>Фон</div>
+      <div className="ts-row">
+        {bgs.map(b => (
+          <button key={b.id}
+            className={`ts-bg-swatch${theme.bg === b.id ? ' ts-bg-swatch--on' : ''}`}
+            style={{background: b.color}}
+            onClick={() => setTheme({...theme, bg: b.id})}
+            title={b.label}>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============ ГЛАВНАЯ ============
+function PageHome({ course, setCourse, setSection, accent, theme, setTheme }) {
+  return (
+    <div className="home-page">
+      <div className="home-hero">
+        <div className="home-flask" aria-hidden="true">
+          {window.MoleculeScene && React.createElement(window.MoleculeScene)}
         </div>
-        <div className="hero-art" aria-hidden="true">
-          {window.MoleculeScene && <window.MoleculeScene />}
+        <h2 className="home-greeting">Привет!</h2>
+        <p className="home-desc">
+          Это онлайн-школа по химии «С&nbsp;нуля».<br/>
+          Выбирай сверху, что сдаёшь, и начинай<br/>
+          подготовку к экзамену.
+        </p>
+        <div className="cta-row" style={{justifyContent:'center', columnGap: '40px', rowGap: '14px'}}>
+          <button className="btn btn--filled" onClick={() => setSection("learn")}>Перейти к курсу</button>
+          <button className="btn" onClick={() => setSection("schedule")}>Расписание вебинаров</button>
         </div>
       </div>
 
-      <div className="course-pick">
-        <CoursePick code="oge" name="ОГЭ" desc="9 класс — 30 тем, 320 задач" color="purple" onPick={() => { setCourse("oge"); setSection("learn"); }} />
-        <CoursePick code="ege" name="ЕГЭ" desc="10–11 класс — 48 тем" color="blue" onPick={() => { setCourse("ege"); setSection("learn"); }} />
-        <CoursePick code="ses" name="Сессия" desc="1–2 курс — медицина, фарм" color="green" onPick={() => { setCourse("ses"); setSection("learn"); }} />
-      </div>
+      {theme && setTheme && (
+        <ThemeSwitcher theme={theme} setTheme={setTheme} />
+      )}
     </div>
   );
 }
@@ -48,7 +87,7 @@ function CoursePick({ code, name, desc, color, onPick }) {
 }
 
 // ============ МОЙ ПРОФИЛЬ ============
-function PageProfile({ profile, setProfile, course, accent, onLogout }) {
+function PageProfile({ profile, setProfile, course, accent, onLogout, onSave, ready, saving, saved, saveError }) {
   const fileRef = useRef(null);
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0];
@@ -89,7 +128,7 @@ function PageProfile({ profile, setProfile, course, accent, onLogout }) {
             )}
             <input ref={fileRef} type="file" accept="image/*" onChange={onFile} />
           </label>
-          <div style={{textAlign: "center", marginTop: 14, fontFamily: "Caveat, cursive", fontSize: 18, color: "var(--ink-soft)"}}>
+          <div style={{textAlign: "center", marginTop: 14, fontSize: 15, color: "var(--ink-soft)"}}>
             нажми, чтобы загрузить
           </div>
         </div>
@@ -162,16 +201,23 @@ function PageProfile({ profile, setProfile, course, accent, onLogout }) {
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 minWidth: 36, height: 36, padding: "0 12px",
                 border: "2px solid var(--ink)", borderRadius: 8,
-                fontFamily: "Unbounded", fontWeight: 800, fontSize: 20
+                fontFamily: "Soyuz Grotesk, sans-serif", fontWeight: 800, fontSize: 20
               }}>{profile.invited}</span>
-              <span style={{fontFamily: "Caveat, cursive", fontSize: 22, color: "var(--ink-soft)"}}>друзей</span>
+              <span style={{fontSize: 16, color: "var(--ink-soft)"}}>друзей</span>
             </span>
           </div>
 
           <div className="row" style={{marginTop: 14}}>
-            <button className="btn btn--filled" style={{opacity:0.6,cursor:'default'}} title="Изменения сохраняются автоматически">Автосохранение ✓</button>
+            <button className="btn btn--filled" onClick={onSave} disabled={saving || !ready}>
+              {!ready ? "Загрузка..." : saving ? "Сохраняем..." : saved ? "Сохранено" : "Сохранить профиль"}
+            </button>
             <button className="btn btn--ghost" onClick={onLogout}>Выйти из аккаунта</button>
           </div>
+          {saveError && (
+            <div style={{marginTop: 10, color: "#b85454", fontSize: 14}}>
+              Не удалось сохранить профиль. Проверь соединение и попробуй ещё раз.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -213,7 +259,7 @@ function PageSchedule({ course, accent, openLesson }) {
     { id: "ses", label: "Сессия", swatch: "ev--ses" },
   ];
 
-  const baseStart = new Date(2026, 4, 4); // Mon 4 May 2026
+  const baseStart = new Date(2026, 4, 4);
   const ws = new Date(baseStart); ws.setDate(ws.getDate() + weekOffset * 7);
   const we = new Date(ws); we.setDate(we.getDate() + 6);
   const fmt = (d) => `${d.getDate()} ${["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"][d.getMonth()]}`;
@@ -298,50 +344,70 @@ function Legend({ swatch, label, active, onClick }) {
     </button>
   );
 }
-// ============ МОЙ РЕЙТИНГ ============
+
+// ============ МОЙ ПРОГРЕСС ============
 function PageRating({ course, accent }) {
-  const data = [
-    { p: 1, name: "Алина Сафина", meta: "11 класс · Казань", pts: 4820, lvl: "магистр" },
-    { p: 2, name: "Тимур Хасанов", meta: "11 класс · Уфа", pts: 4650, lvl: "магистр" },
-    { p: 3, name: "Юлия Кравцова", meta: "10 класс · Москва", pts: 4310, lvl: "адепт" },
-    { p: 4, name: "Денис Зорин", meta: "11 класс · СПб", pts: 4120, lvl: "адепт" },
-    { p: 5, name: "Полина Лесная", meta: "10 класс · Пермь", pts: 3990, lvl: "адепт" },
-    { p: 12, name: "Ты", meta: "11 класс · твой город", pts: 2840, lvl: "ученик", me: true },
-    { p: 13, name: "Михаил Озеров", meta: "11 класс · Нск", pts: 2790, lvl: "ученик" },
-  ];
+  const [progress, setProgress] = React.useState(null);
+
+  React.useEffect(() => {
+    fetch("/api/my-progress?course=" + course, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(setProgress)
+      .catch(() => setProgress(null));
+  }, [course]);
+
+  const p = progress || {
+    viewed_lessons: 0,
+    completed_homework: 0,
+    completed_tests: 0,
+    avg_test_pct: 0,
+    best_test_pct: 0,
+    recent_tests: [],
+  };
+
   return (
     <div>
-      <PageHeader title="Мой рейтинг" sub={`Топ учеников · поток ${course.toUpperCase()}`} accent={accent} />
+      <PageHeader title="Мой прогресс" sub={`Личная статистика · ${course.toUpperCase()}`} accent={accent} />
 
       <div className="cards-row">
-        <KPI num="2 840" label="Мои баллы" tinted accent={accent} />
-        <KPI num="12" label="Место в рейтинге" accent={accent} />
-        <KPI num="86%" label="Средний результат" accent={accent} />
+        <KPI num={p.viewed_lessons} label="Просмотрено уроков" tinted accent={accent} />
+        <KPI num={p.completed_homework} label="Сделано ДЗ" accent={accent} />
+        <KPI num={p.completed_tests} label="Пройдено тестов" accent={accent} />
       </div>
 
-      <div className="rating-list">
-        {data.map(r => (
-          <div key={r.p} className={`rrow ${r.me ? "me" : ""}`}>
-            <div className={`place ${r.p <= 3 ? "medal" : ""}`}>
-              {r.p <= 3 ? ["🥇","🥈","🥉"][r.p-1] : `№${r.p}`}
-            </div>
-            <div className="nm">
-              {r.name}
-              <span className="meta">{r.meta}</span>
-            </div>
-            <div className="pts">{r.pts.toLocaleString("ru-RU")}</div>
-            <div className="lvl">{r.lvl}</div>
+      <div className="cards-row">
+        <KPI num={`${p.avg_test_pct || 0}%`} label="Средний результат тестов" accent={accent} />
+        <KPI num={`${p.best_test_pct || 0}%`} label="Лучший результат" accent={accent} />
+        <KPI num={p.recent_tests.length} label="Последние попытки" accent={accent} />
+      </div>
+
+      <div className="progress-panel">
+        <div className="progress-panel-title">История тестов</div>
+        {p.recent_tests.length ? (
+          <div className="rating-list">
+            {p.recent_tests.map((t, i) => (
+              <div key={t.id || i} className="rrow me">
+                <div className="place">#{i + 1}</div>
+                <div className="nm">
+                  Тест #{t.quiz_id}
+                  <span className="meta">{t.created_at ? new Date(t.created_at).toLocaleDateString("ru-RU") : "дата не указана"}</span>
+                </div>
+                <div className="pts">{t.score}/{t.total}</div>
+                <div className="lvl">{t.pct}%</div>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          <div className="learn-empty">Здесь появятся результаты пройденных тестов</div>
+        )}
       </div>
 
-      <div className="muted" style={{marginTop: 18, fontFamily: "Caveat, cursive", fontSize: 20, textAlign: "center"}}>
-        +10 баллов за домашку · +25 за пробник · +50 за приведённого друга
+      <div className="muted" style={{marginTop: 18, fontSize: 15, textAlign: "center"}}>
+        Статистика видна только по текущему аккаунту.
       </div>
     </div>
   );
 }
-
 function KPI({ num, label, tinted, accent }) {
   return (
     <div className={`kpi-card ${tinted ? "tinted" : ""}`}
@@ -355,13 +421,14 @@ function KPI({ num, label, tinted, accent }) {
 // ============ ОБУЧЕНИЕ ============
 
 const VIDEO_QUALITY_OPTIONS = [
+  { id: "auto", label: "авто" },
   { id: "720p", label: "720p" },
   { id: "480p", label: "480p" },
   { id: "source", label: "исходное" },
 ];
 
 function videoQualitySrc(src, quality) {
-  if (!src || quality === "source") return src;
+  if (!src || quality === "source" || quality === "auto") return src;
   const dot = src.lastIndexOf(".");
   if (dot < 0) return src + "_" + quality + ".mp4";
   return src.slice(0, dot) + "_" + quality + ".mp4";
@@ -371,13 +438,14 @@ function videoHlsSrc(src, quality) {
   if (!src || quality === "source") return null;
   const dot = src.lastIndexOf(".");
   const root = dot < 0 ? src : src.slice(0, dot);
+  if (quality === "auto") return root + "_hls/master.m3u8";
   return root + "_hls/" + quality + ".m3u8";
 }
 
-// ── Компактный плеер для списка курса ──
 function VideoPlayerInline({ src: videoSrc, poster, accent }) {
   const videoRef = React.useRef(null);
   const progressRef = React.useRef(null);
+  const wrapRef = React.useRef(null);
   const pendingTimeRef = React.useRef(null);
   const pendingPlayRef = React.useRef(false);
 
@@ -386,7 +454,9 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
   const [duration, setDuration] = React.useState(0);
   const [volume, setVolume] = React.useState(1);
   const [muted, setMuted] = React.useState(false);
-  const [quality, setQuality] = React.useState("720p");
+  const [fullscreen, setFullscreen] = React.useState(false);
+  const [quality, setQuality] = React.useState("auto");
+  const [qualityOpen, setQualityOpen] = React.useState(false);
 
   const ac  = accent ? accent.c : "var(--tab-yellow)";
   const acd = accent ? accent.d : "var(--tab-yellow-d)";
@@ -423,6 +493,16 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
     e.stopPropagation();
   };
 
+  const toggleFS = e => {
+    const wrap = wrapRef.current; if (!wrap) return;
+    if (!document.fullscreenElement) {
+      wrap.requestFullscreen && wrap.requestFullscreen();
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+    }
+    e.stopPropagation();
+  };
+
   const changeQuality = (nextQuality, e) => {
     if (e) e.stopPropagation();
     const v = videoRef.current;
@@ -431,6 +511,7 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
       pendingPlayRef.current = !v.paused;
     }
     setQuality(nextQuality);
+    setQualityOpen(false);
   };
 
   const onMetadata = () => {
@@ -460,11 +541,7 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
     } else if (activeHlsSrc && window.Hls && window.Hls.isSupported()) {
       hls = new window.Hls({ maxBufferLength: 12, backBufferLength: 12 });
       hls.on(window.Hls.Events.ERROR, function(_, data) {
-        if (data && data.fatal) {
-          hls.destroy();
-          hls = null;
-          fallback();
-        }
+        if (data && data.fatal) { hls.destroy(); hls = null; fallback(); }
       });
       hls.loadSource(activeHlsSrc);
       hls.attachMedia(v);
@@ -475,14 +552,21 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
     return () => { if (hls) hls.destroy(); };
   }, [activeHlsSrc, activeSrc]);
 
+  React.useEffect(() => {
+    const onFS = () => setFullscreen(document.fullscreenElement === wrapRef.current);
+    document.addEventListener("fullscreenchange", onFS);
+    return () => document.removeEventListener("fullscreenchange", onFS);
+  }, []);
+
   const btnBase = {
     background:"none",border:"none",color:"rgba(255,255,255,0.8)",
     cursor:"pointer",padding:"3px 5px",fontSize:16,lineHeight:1,
     display:"flex",alignItems:"center",justifyContent:"center",
   };
+  const qualityLabel = (VIDEO_QUALITY_OPTIONS.find(q => q.id === quality) || VIDEO_QUALITY_OPTIONS[0]).label;
 
   return (
-    <div style={{
+    <div ref={wrapRef} style={{
       position:"relative",borderRadius:14,overflow:"hidden",
       background:"#1c130a",border:"2.5px solid var(--ink)",
       boxShadow:"0 12px 28px -16px rgba(68,45,29,0.5)",
@@ -502,7 +586,6 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
         onError={onVideoError}
       />
 
-      {/* Centre play */}
       {!playing && (
         <div onClick={e => { e.stopPropagation(); togglePlay(); }} style={{
           position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:3,
@@ -515,7 +598,6 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
         }}>&#9654;</div>
       )}
 
-      {/* Controls */}
       <div style={{
         position:"absolute",bottom:0,left:0,right:0,zIndex:3,
         padding:"24px 14px 10px",
@@ -560,21 +642,49 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
 
           <div style={{flex:1}} />
 
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            {VIDEO_QUALITY_OPTIONS.map(q => (
-              <button key={q.id} onClick={e=>changeQuality(q.id,e)}
-                style={{
-                  border:"1px solid rgba(255,255,255,0.35)",
-                  background:quality===q.id?ac:"rgba(0,0,0,0.28)",
-                  color:quality===q.id?"var(--ink)":"rgba(255,255,255,0.82)",
-                  borderRadius:999,
-                  padding:"3px 7px",
-                  fontSize:11,
-                  fontWeight:700,
-                  cursor:"pointer",
-                }}>{q.label}</button>
-            ))}
+          <div style={{position:"relative"}}>
+            {qualityOpen && (
+              <div style={{
+                position:"absolute",right:0,bottom:31,zIndex:6,
+                minWidth:74,overflow:"hidden",
+                borderRadius:10,
+                background:"rgba(12,7,4,0.92)",
+                boxShadow:"0 10px 24px rgba(0,0,0,0.32)",
+                border:"1px solid rgba(255,255,255,0.12)",
+              }}>
+                {VIDEO_QUALITY_OPTIONS.map(q => (
+                  <button key={q.id} onClick={e=>changeQuality(q.id,e)}
+                    style={{
+                      display:"block",width:"100%",
+                      border:"none",
+                      background:quality===q.id?ac:"transparent",
+                      color:quality===q.id?"var(--ink)":"rgba(255,255,255,0.88)",
+                      padding:"7px 10px",
+                      fontSize:11,
+                      fontWeight:800,
+                      textAlign:"center",
+                      cursor:"pointer",
+                    }}>{q.label}</button>
+                ))}
+              </div>
+            )}
+            <button onClick={e=>{e.stopPropagation();setQualityOpen(open=>!open);}}
+              style={{
+                border:"1px solid rgba(255,255,255,0.35)",
+                background:ac,
+                color:"var(--ink)",
+                borderRadius:999,
+                padding:"4px 9px",
+                fontSize:11,
+                fontWeight:800,
+                cursor:"pointer",
+                minWidth:52,
+              }}>{qualityLabel}</button>
           </div>
+
+          <button onClick={toggleFS} style={btnBase} title="Полный экран">
+            {fullscreen ? "✕" : "⛶"}
+          </button>
         </div>
       </div>
     </div>
@@ -583,6 +693,11 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
 
 function PageLearn({ course, accent, openLesson }) {
   const [courseVideos, setCourseVideos] = React.useState([]);
+  const [activePanel, setActivePanel] = React.useState("topics");
+  const [sesFaculty, setSesFaculty] = React.useState(null);
+  const [selectedVideo, setSelectedVideo] = React.useState(null);
+  const topicsRef = React.useRef(null);
+  const videosRef = React.useRef(null);
 
   React.useEffect(() => {
     fetch("/api/videos?course=" + course)
@@ -599,136 +714,239 @@ function PageLearn({ course, accent, openLesson }) {
       .catch(() => {});
   }, [course]);
 
+  React.useEffect(() => {
+    setActivePanel("topics");
+    setSesFaculty(null);
+    setSelectedVideo(null);
+  }, [course]);
+
+  const scrollTo = ref => {
+    window.setTimeout(() => {
+      if (ref.current) ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 30);
+  };
+
+  const isDentalVideo = video => {
+    const text = ((video.title || "") + " " + (video.description || "")).toLowerCase();
+    return text.includes("стомат");
+  };
+
+  const sesFacultyVideos = faculty => courseVideos.filter(v => (
+    faculty === "dental"
+      ? (v.faculty === "dental" || (!v.faculty && isDentalVideo(v)))
+      : (v.faculty === "medical" || (!v.faculty && !isDentalVideo(v)))
+  ));
+
+  const renderVideoDetail = (video, onBack) => (
+    <div className="video-detail">
+      <button className="learn-back" type="button" onClick={onBack}>
+        ← к списку видео
+      </button>
+      <div className="video-card video-card-open">
+        <div className="video-card-title">{video.title}</div>
+        <VideoPlayerInline
+          src={"/media/videos/" + video.filename}
+          poster={video.thumbnail ? "/media/videos/" + video.thumbnail : undefined}
+          accent={accent}
+        />
+        <div className="video-conspect">
+          <div className="video-conspect-title">Конспект видео</div>
+          <div className="video-conspect-text">
+            {video.description || "Конспект скоро появится"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderVideosFolder = (videos, title, emptyText) => (
+    <div className="video-folder" ref={videosRef}>
+      <div className="video-folder-title">{title}</div>
+      {selectedVideo ? (
+        renderVideoDetail(selectedVideo, () => setSelectedVideo(null))
+      ) : videos.length === 0 ? (
+        <div className="learn-empty">{emptyText}</div>
+      ) : (
+        <div className="video-folder-list">
+          {videos.map(v => (
+            <button key={v.id} className="video-list-card" type="button" onClick={() => setSelectedVideo(v)}>
+              <div className="video-card-title">{v.title}</div>
+              {v.description && <div className="video-card-desc">{v.description}</div>}
+              <span className="video-list-open">Открыть видео</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  if (course === "ses") {
+    const faculties = [
+      {
+        id: "medical",
+        title: "лечебно-педиатрический факультет",
+        videos: sesFacultyVideos("medical"),
+      },
+      {
+        id: "dental",
+        title: "стоматологический факультет",
+        videos: sesFacultyVideos("dental"),
+      },
+    ];
+    const selectedFaculty = faculties.find(f => f.id === sesFaculty);
+
+    return (
+      <div>
+        <PageHeader title="Материалы курса" sub="Программа курса · SES" accent={accent} />
+
+        {!selectedFaculty ? (
+          <div className="ses-faculty-grid">
+            {faculties.map(f => (
+              <button
+                key={f.id}
+                className="ses-faculty-card"
+                type="button"
+                onClick={() => { setSesFaculty(f.id); setSelectedVideo(null); }}
+              >
+                <span>{f.title}</span>
+                <small>{f.videos.length ? `${f.videos.length} видео` : "видео скоро появятся"}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div>
+            <button className="learn-back" type="button" onClick={() => { setSesFaculty(null); setSelectedVideo(null); }}>
+              ← к факультетам
+            </button>
+            {renderVideosFolder(
+              selectedFaculty.videos,
+              selectedFaculty.title,
+              "Видеоматериалы для этого факультета пока не добавлены"
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const openTopics = () => {
+    setActivePanel("topics");
+    setSelectedVideo(null);
+    scrollTo(topicsRef);
+  };
+
+  const openWebinars = () => {
+    setActivePanel("webinars");
+    setSelectedVideo(null);
+    scrollTo(videosRef);
+  };
+
   return (
     <div>
-      <PageHeader title="Обучение" sub={`Программа курса · ${course.toUpperCase()}`} accent={accent} />
+      <PageHeader title="Материалы курса" sub={`Программа курса · ${course.toUpperCase()}`} accent={accent} />
 
-      <div className="cards-row">
-        <KPI num={topics.length} label="Всего тем" tinted accent={accent} />
+      <div className="learn-entry-grid">
+        <button className="learn-entry-card" type="button" onClick={openTopics}>
+          <span className="learn-entry-num">{topics.length}</span>
+          <span className="learn-entry-title">темы</span>
+          <small>все темы курса</small>
+        </button>
+        <button className="learn-entry-card" type="button" onClick={() => { setActivePanel("tasks"); setSelectedVideo(null); }}>
+          <span className="learn-entry-title">банк заданий</span>
+          <small>тренировка по номерам</small>
+        </button>
+        <button className="learn-entry-card" type="button" onClick={openWebinars}>
+          <span className="learn-entry-title">вебинары</span>
+          <small>{courseVideos.length ? `${courseVideos.length} видео` : "папка с видео"}</small>
+        </button>
       </div>
 
-      <div className="topic-list">
-        {topics.map((t, i) => (
-          <div key={i} className="topic"
-               style={{"--accent-soft": accent.soft, "--accent-d": accent.d}}
-               onClick={() => openLesson && openLesson(t.lesson_idx, t.title)}>
-            <span className="t-num">{i+1}</span>
-            <span className="t-title">{t.title}</span>
-            <span className="t-status todo">{"→"}</span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{marginTop: 18, fontFamily: "Caveat, cursive", fontSize: 20, color: "var(--ink-soft)", textAlign: "center"}}>
-        кликни по теме, чтобы открыть урок с видео и тестом ↑
-      </div>
-
-      {courseVideos.length > 0 && (
-        <div style={{marginTop: 28}}>
-          <div style={{fontWeight: 700, fontSize: 16, marginBottom: 14, color: "var(--ink)"}}>
-            Видеоматериалы курса
-          </div>
-          <div style={{display: "flex", flexDirection: "column", gap: 20}}>
-            {courseVideos.map(v => (
-              <div key={v.id} style={{
-                background: "var(--paper, #fff9f0)",
-                border: "2px solid var(--ink)",
-                borderRadius: 14,
-                padding: "16px 18px",
-                boxShadow: "3px 3px 0 var(--ink)",
-              }}>
-                <div style={{fontWeight: 700, fontSize: 15, marginBottom: v.description ? 6 : 12, color: "var(--ink)"}}>
-                  {v.title}
-                </div>
-                {v.description && (
-                  <div style={{fontSize: 13, color: "var(--ink-soft)", marginBottom: 12}}>
-                    {v.description}
-                  </div>
-                )}
-                <VideoPlayerInline src={"/media/videos/" + v.filename} poster={v.thumbnail ? "/media/videos/" + v.thumbnail : undefined} accent={accent} />
+      {activePanel === "tasks" ? (
+        <div className="learn-empty learn-empty-large">
+          Банк заданий в разработке
+        </div>
+      ) : activePanel === "webinars" ? (
+        renderVideosFolder(courseVideos, "Вебинары курса", "Видеоматериалы курса пока не добавлены")
+      ) : (
+        <React.Fragment>
+          <div className="topic-list" ref={topicsRef}>
+            {topics.map((t, i) => (
+              <div key={i} className="topic"
+                   style={{"--accent-soft": accent.soft, "--accent-d": accent.d}}
+                   onClick={() => openLesson && openLesson(t.lesson_idx, t.title)}>
+                <span className="t-num">{i+1}</span>
+                <span className="t-title">{t.title}</span>
+                <span className="t-status todo">{"→"}</span>
               </div>
             ))}
           </div>
-        </div>
+
+          <div style={{marginTop: 18, fontSize: 15, color: "var(--ink-soft)", textAlign: "center"}}>
+            кликни по теме, чтобы открыть урок с видео и тестом ↑
+          </div>
+        </React.Fragment>
       )}
+
     </div>
   );
 }
 
 // ============ ОБ ЭКЗАМЕНЕ ============
-function PageExam({ course, accent }) {
-  const data = {
-    oge: {
-      title: "Об экзамене · ОГЭ",
-      sub: "ЕГЭ для 9 класса · вариант + теория",
-      variants: [
-        { n: 1, name: "Демо-вариант 2026" },
-        { n: 2, name: "Открытый банк ФИПИ" },
-        { n: 3, name: "Тренировочный №3" },
-      ],
-      sections: [
-        { tag: "Часть 1", title: "Задания с кратким ответом", count: "1–19" },
-        { tag: "Часть 2", title: "Задания с развёрнутым ответом", count: "20–24" },
-      ],
+function PageExam({ accent }) {
+  const cards = [
+    {
+      tag: "ОГЭ",
+      title: "9 класс",
+      meta: "24 задания",
+      text: "Две части: задания с кратким ответом и развёрнутые решения. Основной фокус — базовые понятия, реакции и расчёты.",
     },
-    ege: {
-      title: "Об экзамене · ЕГЭ",
-      sub: "вариант для 11 класса · теория",
-      variants: [
-        { n: 1, name: "Демо-вариант 2026" },
-        { n: 2, name: "Досрочный вариант" },
-        { n: 3, name: "Сборник Добротина" },
-      ],
-      sections: [
-        { tag: "Часть 1", title: "Задания с кратким ответом", count: "1–28" },
-        { tag: "Часть 2", title: "Задания с развёрнутым ответом", count: "29–34" },
-      ],
+    {
+      tag: "ЕГЭ",
+      title: "11 класс",
+      meta: "34 задания",
+      text: "Проверяются неорганика, органика, расчётные задачи и развёрнутые ответы с критериями оценивания.",
     },
-    ses: {
-      title: "Об экзамене · Сессия",
-      sub: "химия для медицинских и фарм. специальностей",
-      variants: [
-        { n: 1, name: "Лечебный, педиатрический ф-т" },
-        { n: 2, name: "Стоматологический ф-т" },
-        { n: 3, name: "Фармацевтический ф-т" },
-      ],
-      sections: [
-        { tag: "Билет I", title: "Общая и неорганическая химия", count: "1–25" },
-        { tag: "Билет II", title: "Биохимия", count: "26–50" },
-      ],
+    {
+      tag: "СЕССИЯ",
+      title: "Вуз",
+      meta: "зачёты и билеты",
+      text: "Материал зависит от факультета: общая, неорганическая, органическая химия и профильные медицинские темы.",
     },
-  }[course];
+  ];
+
+  const sections = [
+    { tag: "1", title: "Сначала разбираем структуру", count: "формат, баллы, критерии" },
+    { tag: "2", title: "Потом закрываем теорию", count: "темы без привязки к вкладкам" },
+    { tag: "3", title: "После этого тренируем задания", count: "варианты, тесты, разборы" },
+  ];
 
   return (
     <div>
-      <PageHeader title={data.title} sub={data.sub} accent={accent} />
+      <PageHeader title="Об экзамене" sub="Статичная памятка по формату и подготовке" accent={accent} />
 
-      <div style={{fontFamily: "Caveat, cursive", fontSize: 22, color: "var(--ink-soft)", marginBottom: 10}}>
-        варианты:
+      <div style={{fontSize: 16, color: "var(--ink-soft)", marginBottom: 10}}>
+        основные форматы:
       </div>
-      <div className="variant-grid">
-        {data.variants.map(v => (
-          <div key={v.n} className="variant-card">
-            <span className="v-tag" style={{background: accent.d}}>В{v.n}</span>
-            <div className="v-num">Вариант {v.n}</div>
-            <div className="v-name">{v.name}</div>
-            <div className="v-actions">
-              <button className="btn btn--filled">Открыть</button>
-              <button className="btn btn--ghost">Скачать PDF</button>
-            </div>
+      <div className="variant-grid exam-static-grid">
+        {cards.map(c => (
+          <div key={c.tag} className="variant-card exam-info-card">
+            <span className="v-tag" style={{background: accent.d}}>{c.tag}</span>
+            <div className="v-num">{c.title}</div>
+            <div className="v-name">{c.meta}</div>
+            <p className="exam-card-text">{c.text}</p>
           </div>
         ))}
       </div>
 
-      <div style={{fontFamily: "Caveat, cursive", fontSize: 22, color: "var(--ink-soft)", margin: "24px 0 10px"}}>
-        структура экзамена:
+      <div style={{fontSize: 16, color: "var(--ink-soft)", margin: "24px 0 10px"}}>
+        как готовиться:
       </div>
       <div className="stack">
-        {data.sections.map((s, i) => (
+        {sections.map((s, i) => (
           <div key={i} className="topic" style={{"--accent-soft": accent.soft, "--accent-d": accent.d}}>
-            <span className="t-num">{s.tag.split(" ")[1] || s.tag[0]}</span>
+            <span className="t-num">{s.tag}</span>
             <span className="t-title">{s.title}</span>
-            <span className="t-meta">задания {s.count}</span>
+            <span className="t-meta">{s.count}</span>
             <span className="t-status todo">→</span>
           </div>
         ))}
@@ -765,13 +983,13 @@ function PageInvite({ profile, setProfile, accent }) {
             +50
             <small>баллов в рейтинг за каждого друга</small>
           </div>
-          <div className="muted" style={{fontFamily: "Caveat, cursive", fontSize: 22}}>
+          <div className="muted" style={{fontSize: 16}}>
             а ещё друг получит -20% на первый месяц подписки 💛
           </div>
         </div>
 
         <div>
-          <div style={{fontFamily: "Caveat, cursive", fontSize: 22, color: "var(--ink-soft)", marginBottom: 8}}>
+          <div style={{fontSize: 16, color: "var(--ink-soft)", marginBottom: 8}}>
             твоя реферальная ссылка:
           </div>
           <div className="invite-link">
@@ -790,8 +1008,8 @@ function PageInvite({ profile, setProfile, accent }) {
             </button>
           </div>
 
-          <div style={{marginTop: 22, fontFamily: "Caveat, cursive", fontSize: 22, color: "var(--ink-soft)"}}>
-            приглашено: <b key={profile.invited} className="invited-num bump-key" style={{fontFamily: "Unbounded", fontSize: 26}}>{profile.invited}</b> {wordFriend(profile.invited)}
+          <div style={{marginTop: 22, fontSize: 16, color: "var(--ink-soft)"}}>
+            приглашено: <b key={profile.invited} className="invited-num bump-key" style={{fontFamily: "Soyuz Grotesk, sans-serif", fontSize: 22}}>{profile.invited}</b> {wordFriend(profile.invited)}
           </div>
 
           <div className="friend-list">
@@ -858,7 +1076,7 @@ function PageAbout({ accent }) {
 // ============ ПОМОЩЬ ============
 function PageHelp({ accent }) {
   const items = [
-    { q: "Как оплатить подписку?", a: "Открой раздел «Обучение · Оплата» в правом верхнем углу. Принимаем карты РФ, СБП и иностранные карты." },
+    { q: "Как оплатить подписку?", a: "Открой раздел «Подписка» в правом верхнем углу. Принимаем карты РФ, СБП и иностранные карты." },
     { q: "Что делать, если пропустил вебинар?", a: "Запись появляется в течение суток в разделе «Расписание». Кликни по карточке вебинара — откроется страница записи." },
     { q: "Когда проверят домашку?", a: "На подписке Light — общая проверка по ответам, на PRO куратор проверяет вручную в течение 48 часов." },
     { q: "Можно ли сменить курс ОГЭ → ЕГЭ?", a: "Да, напиши в чат поддержки. Если осталось время на подписке — переведём остаток дней на новый курс." },
@@ -899,7 +1117,7 @@ function PageHelp({ accent }) {
   );
 }
 
-// ============ ОПЛАТА (sub-section of Обучение) ============
+// ============ ОПЛАТА ============
 function PagePay({ profile, setProfile, accent, currentUser, onLoginRequired }) {
   const setSub = (s) => {
     if (!currentUser) { onLoginRequired && onLoginRequired(); return; }
@@ -920,7 +1138,7 @@ function PagePay({ profile, setProfile, accent, currentUser, onLoginRequired }) 
       <div className="price-grid">
         <div className="price-card">
           <div className="p-name">Подписка Light</div>
-          <div className="muted" style={{fontFamily: "Caveat, cursive", fontSize: 20, marginTop: 2}}>
+          <div className="muted" style={{fontSize: 16, marginTop: 2}}>
             всё базовое для подготовки
           </div>
           <ul>
@@ -942,7 +1160,7 @@ function PagePay({ profile, setProfile, accent, currentUser, onLoginRequired }) 
         <div className="price-card pro">
           <span className="p-tag">рекомендуем</span>
           <div className="p-name">Подписка PRO</div>
-          <div className="muted" style={{fontFamily: "Caveat, cursive", fontSize: 20, marginTop: 2}}>
+          <div className="muted" style={{fontSize: 16, marginTop: 2}}>
             с личным куратором
           </div>
           <ul>
@@ -981,7 +1199,6 @@ function PageHeader({ title, sub, accent }) {
   );
 }
 
-// Export to window so app.jsx can grab them
 Object.assign(window, {
   PageHome, PageProfile, PageSchedule, PageRating,
   PageLearn, PageExam, PageInvite, PageAbout, PageHelp, PagePay,

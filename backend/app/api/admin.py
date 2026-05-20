@@ -217,6 +217,7 @@ async def upload_video(
     background_tasks: BackgroundTasks,
     title: str = Form(...),
     course: str = Form("main"),
+    faculty: Optional[str] = Form(None),
     description: str = Form(""),
     lesson_idx: Optional[int] = Form(None),
     file: UploadFile = File(...),
@@ -235,8 +236,13 @@ async def upload_video(
     with open(path, "wb") as f:
         f.write(content)
     size_bytes = os.path.getsize(path)
+    if course != "ses":
+        faculty = None
+    elif faculty not in {"medical", "dental"}:
+        raise HTTPException(400, "Faculty is required for session videos")
     video = Video(title=title, description=description or None,
                   filename=filename, course=course,
+                  faculty=faculty,
                   lesson_idx=lesson_idx, size_bytes=size_bytes)
     db.add(video); db.commit(); db.refresh(video)
     background_tasks.add_task(_prepare_uploaded_video, path)
@@ -454,6 +460,22 @@ def update_user(user_id: int,
     db.commit()
     return {"message": "Обновлено"}
 
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int,
+                db: Session = Depends(get_db),
+                admin: User = Depends(get_admin_user)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    if user.id == admin.id:
+        raise HTTPException(400, "Cannot delete current admin")
+    if user.is_admin:
+        raise HTTPException(400, "Cannot delete admin user")
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted"}
+
+
 from app.models.topic import Topic
 
 # ─── Topics ──────────────────────────────────────────────────────────────────
@@ -669,4 +691,3 @@ def update_schedule_event(
         db.commit()
     ev = db.query(ScheduleEvent).filter(ScheduleEvent.id == event_id).first()
     return schedule_event_out(ev)
-

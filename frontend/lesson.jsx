@@ -193,13 +193,14 @@ function getLesson(course, idx) {
 
 // ============ КАСТОМНЫЙ ВИДЕОПЛЕЕР ============
 const LESSON_VIDEO_QUALITY_OPTIONS = [
+  { id: "auto", label: "авто" },
   { id: "720p", label: "720p" },
   { id: "480p", label: "480p" },
   { id: "source", label: "исходное" },
 ];
 
 function lessonVideoQualitySrc(src, quality) {
-  if (!src || quality === "source") return src;
+  if (!src || quality === "source" || quality === "auto") return src;
   const dot = src.lastIndexOf(".");
   if (dot < 0) return src + "_" + quality + ".mp4";
   return src.slice(0, dot) + "_" + quality + ".mp4";
@@ -209,6 +210,7 @@ function lessonVideoHlsSrc(src, quality) {
   if (!src || quality === "source") return null;
   const dot = src.lastIndexOf(".");
   const root = dot < 0 ? src : src.slice(0, dot);
+  if (quality === "auto") return root + "_hls/master.m3u8";
   return root + "_hls/" + quality + ".m3u8";
 }
 
@@ -228,7 +230,8 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
   const [showControls, setShowControls] = React.useState(true);
   const [fullscreen, setFullscreen] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
-  const [quality, setQuality] = React.useState("720p");
+  const [quality, setQuality] = React.useState("auto");
+  const [qualityOpen, setQualityOpen] = React.useState(false);
 
   const ac  = accent ? accent.c : "var(--tab-yellow)";
   const acd = accent ? accent.d : "var(--tab-yellow-d)";
@@ -284,6 +287,7 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
       pendingPlayRef.current = !v.paused;
     }
     setQuality(nextQuality);
+    setQualityOpen(false);
   };
 
   const onMetadata = () => {
@@ -354,6 +358,7 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
     cursor: "pointer", padding: "4px 6px", fontSize: 18, lineHeight: 1,
     display: "flex", alignItems: "center", justifyContent: "center",
   };
+  const qualityLabel = (LESSON_VIDEO_QUALITY_OPTIONS.find(q => q.id === quality) || LESSON_VIDEO_QUALITY_OPTIONS[0]).label;
 
   return (
     <div ref={wrapRef} onMouseMove={resetHide} onTouchStart={resetHide} onMouseLeave={() => playing && setShowControls(false)}
@@ -446,20 +451,44 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
 
           <div style={{flex:1}} />
 
-          <div style={{display:"flex",alignItems:"center",gap:5}}>
-            {LESSON_VIDEO_QUALITY_OPTIONS.map(q => (
-              <button key={q.id} onClick={e=>changeQuality(q.id,e)}
-                style={{
-                  border:"1px solid rgba(255,255,255,0.35)",
-                  background:quality===q.id?ac:"rgba(0,0,0,0.28)",
-                  color:quality===q.id?"var(--ink)":"rgba(255,255,255,0.82)",
-                  borderRadius:999,
-                  padding:"4px 8px",
-                  fontSize:12,
-                  fontWeight:700,
-                  cursor:"pointer",
-                }}>{q.label}</button>
-            ))}
+          <div style={{position:"relative"}}>
+            {qualityOpen && (
+              <div style={{
+                position:"absolute",right:0,bottom:34,zIndex:6,
+                minWidth:82,overflow:"hidden",
+                borderRadius:10,
+                background:"rgba(12,7,4,0.92)",
+                boxShadow:"0 10px 24px rgba(0,0,0,0.32)",
+                border:"1px solid rgba(255,255,255,0.12)",
+              }}>
+                {LESSON_VIDEO_QUALITY_OPTIONS.map(q => (
+                  <button key={q.id} onClick={e=>changeQuality(q.id,e)}
+                    style={{
+                      display:"block",width:"100%",
+                      border:"none",
+                      background:quality===q.id?ac:"transparent",
+                      color:quality===q.id?"var(--ink)":"rgba(255,255,255,0.88)",
+                      padding:"8px 11px",
+                      fontSize:12,
+                      fontWeight:800,
+                      textAlign:"center",
+                      cursor:"pointer",
+                    }}>{q.label}</button>
+                ))}
+              </div>
+            )}
+            <button onClick={e=>{e.stopPropagation();setQualityOpen(open=>!open);}}
+              style={{
+                border:"1px solid rgba(255,255,255,0.35)",
+                background:ac,
+                color:"var(--ink)",
+                borderRadius:999,
+                padding:"5px 10px",
+                fontSize:12,
+                fontWeight:800,
+                cursor:"pointer",
+                minWidth:58,
+              }}>{qualityLabel}</button>
           </div>
 
           <button onClick={toggleFS} style={btnBase} title="Полный экран">
@@ -489,6 +518,13 @@ function PageLesson({ course, lessonIndex, topicTitle, onBack, accent }) {
   const [submitted, setSubmitted] = React.useState(false);
 
   React.useEffect(() => {
+    fetch("/api/lesson-view", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ course: c, lesson_idx: lessonIndex }),
+    }).catch(() => {});
+
     fetch("/api/videos?course=" + c)
       .then(r => r.json())
       .then(videos => {

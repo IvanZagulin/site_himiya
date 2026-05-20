@@ -11,6 +11,7 @@ class Video(Base):
     description = Column(Text, nullable=True)
     filename    = Column(String(500), nullable=False, unique=True)
     course      = Column(String(50), nullable=False, default="main")  # main, oge, ege, ses
+    faculty     = Column(String(50), nullable=True)  # medical, dental for ses
     lesson_idx  = Column(Integer, nullable=True)
     is_active   = Column(Boolean, default=True, nullable=False)
     created_at  = Column(DateTime, server_default=func.now(), nullable=False)

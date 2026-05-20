@@ -528,12 +528,13 @@ async function loadUsers() {
       <td><span class="badge ${u.is_admin?'badge-blue':'badge-gray'}">${u.is_admin?'Админ':'Юзер'}</span></td>
       <td><span class="badge ${u.is_active?'badge-green':'badge-gray'}">${u.is_active?'Да':'Нет'}</span></td>
       <td>${fmtDate(u.created_at)}</td>
-      <td><button class="btn btn-sm btn-secondary" onclick="toggleUser(${u.id},${u.is_active})">${u.is_active?'Блок':'Разблок'}</button></td>
+      <td>${u.is_admin ? '<span class="badge badge-gray">Нельзя</span>' : `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Удалить</button>`}</td>
     </tr>`).join('');
 }
 
-async function toggleUser(id,active){
-  await apiFetch('/admin/users/'+id+'?is_active='+(!active),{method:'PATCH'});
+async function deleteUser(id){
+  if (!confirm('Удалить пользователя с сайта? Это действие нельзя отменить.')) return;
+  await apiFetch('/admin/users/'+id,{method:'DELETE'});
   loadUsers();
 }
 
@@ -703,6 +704,11 @@ function renderContentPanel(idx, title, vList, dList, qList, sList) {
         <div class="lp-upload-box">
           <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Загрузить видео</div>
           <input id="lp-vtitle-${idx}" type="text" placeholder="Название" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:6px;font-family:inherit;outline:none;" />
+          ${_topicCourse === 'ses' ? `
+          <select id="lp-vfaculty-${idx}" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:6px;font-family:inherit;outline:none;">
+            <option value="medical">Лечебно-педиатрический факультет</option>
+            <option value="dental">Стоматологический факультет</option>
+          </select>` : ''}
           <div id="lp-vdrop-${idx}" class="lp-drop-zone"
                ondragover="event.preventDefault();this.classList.add('drag')"
                ondragleave="this.classList.remove('drag')"
@@ -1072,6 +1078,8 @@ async function lpUploadVideo(idx) {
   const fd = new FormData();
   fd.append('title', title);
   fd.append('course', _topicCourse);
+  const facultyEl = document.getElementById('lp-vfaculty-'+idx);
+  if (facultyEl) fd.append('faculty', facultyEl.value);
   fd.append('lesson_idx', idx);
   fd.append('file', file);
 

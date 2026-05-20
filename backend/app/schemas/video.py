@@ -9,6 +9,7 @@ class VideoResponse(BaseModel):
     description: Optional[str]
     filename: str
     course: str
+    faculty: Optional[str] = None
     lesson_idx: Optional[int]
     is_active: bool
     thumbnail: Optional[str] = None
@@ -23,5 +24,6 @@ class VideoUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     course: Optional[str] = None
+    faculty: Optional[str] = None
     lesson_idx: Optional[int] = None
     is_active: Optional[bool] = None

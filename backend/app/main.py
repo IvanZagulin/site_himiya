@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from passlib.context import CryptContext
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -33,6 +34,24 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds
 
 def _create_tables():
     Base.metadata.create_all(bind=engine)
+
+
+def _ensure_user_profile_columns():
+    columns = {c["name"] for c in inspect(engine).get_columns("users")}
+    statements = {
+        "first_name": "ALTER TABLE users ADD COLUMN first_name VARCHAR(100)",
+        "last_name": "ALTER TABLE users ADD COLUMN last_name VARCHAR(100)",
+        "dob": "ALTER TABLE users ADD COLUMN dob VARCHAR(20)",
+        "grade": "ALTER TABLE users ADD COLUMN grade VARCHAR(50) DEFAULT '11 класс'",
+        "study_type": "ALTER TABLE users ADD COLUMN study_type VARCHAR(20) DEFAULT 'school'",
+        "subscription": "ALTER TABLE users ADD COLUMN subscription VARCHAR(20) DEFAULT 'none'",
+        "invited_count": "ALTER TABLE users ADD COLUMN invited_count INTEGER NOT NULL DEFAULT 0",
+        "photo_url": "ALTER TABLE users ADD COLUMN photo_url TEXT",
+    }
+    with engine.begin() as conn:
+        for name, statement in statements.items():
+            if name not in columns:
+                conn.execute(text(statement))
 
 
 def _ensure_admin():
@@ -85,6 +104,7 @@ def _ensure_topics():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _create_tables()
+    _ensure_user_profile_columns()
     _ensure_admin()
     _ensure_topics()
     os.makedirs(settings.MEDIA_DIR, exist_ok=True)
