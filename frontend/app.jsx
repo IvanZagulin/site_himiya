@@ -75,6 +75,7 @@ function profilePayload(p) {
     dob: p.dob || '',
     grade: p.grade || '',
     subscription: p.subscription || 'none',
+    photoUrl: p.photo || null,
   };
 }
 

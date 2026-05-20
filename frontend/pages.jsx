@@ -96,7 +96,8 @@ function PageProfile({ profile, setProfile, course, accent, onLogout }) {
     r.onload = () => setProfile({ ...profile, photo: r.result });
     r.readAsDataURL(f);
   };
-  const studyType = profile.studyType || (course === "ses" ? "student" : "school");
+  const savedGrade = profile.grade || "";
+  const studyType = profile.studyType || (savedGrade.includes("курс") ? "student" : (course === "ses" ? "student" : "school"));
   const classOptions = studyType === "student"
     ? ["1 курс", "2 курс", "3 курс", "4 курс", "5 курс", "6 курс"]
     : ["5 класс", "6 класс", "7 класс", "8 класс", "9 класс", "10 класс", "11 класс"];

@@ -16,6 +16,7 @@ class ProfileUpdate(BaseModel):
     dob:       Optional[str] = None
     grade:     Optional[str] = None
     subscription: Optional[str] = None
+    photoUrl:  Optional[str] = None
 
 
 class ProfileOut(BaseModel):
@@ -59,6 +60,7 @@ def update_profile(
         allowed = {'none', 'light', 'pro'}
         if data.subscription in allowed:
             user.subscription = data.subscription
+    if data.photoUrl is not None: user.photo_url = data.photoUrl
     db.commit()
     db.refresh(user)
     return _to_out(user)
