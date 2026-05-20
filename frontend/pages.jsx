@@ -59,7 +59,7 @@ function PageHome({ course, setCourse, setSection, accent, theme, setTheme }) {
           подготовку к экзамену.
         </p>
         <div className="cta-row" style={{justifyContent:'center', columnGap: '40px', rowGap: '14px'}}>
-          <button className="btn btn--filled" onClick={() => setSection("learn")}>Перейти к курсу</button>
+          <button className="btn btn--filled" onClick={() => setSection("learn")}>Начать обучение</button>
           <button className="btn" onClick={() => setSection("schedule")}>Расписание вебинаров</button>
         </div>
       </div>
@@ -87,7 +87,7 @@ function CoursePick({ code, name, desc, color, onPick }) {
 }
 
 // ============ МОЙ ПРОФИЛЬ ============
-function PageProfile({ profile, setProfile, course, accent, onLogout, onSave, ready, saving, saved, saveError }) {
+function PageProfile({ profile, setProfile, course, accent, onLogout }) {
   const fileRef = useRef(null);
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0];
@@ -208,16 +208,9 @@ function PageProfile({ profile, setProfile, course, accent, onLogout, onSave, re
           </div>
 
           <div className="row" style={{marginTop: 14}}>
-            <button className="btn btn--filled" onClick={onSave} disabled={saving || !ready}>
-              {!ready ? "Загрузка..." : saving ? "Сохраняем..." : saved ? "Сохранено" : "Сохранить профиль"}
-            </button>
+            <button className="btn btn--filled" style={{opacity:0.6,cursor:'default'}} title="Изменения сохраняются автоматически">Автосохранение ✓</button>
             <button className="btn btn--ghost" onClick={onLogout}>Выйти из аккаунта</button>
           </div>
-          {saveError && (
-            <div style={{marginTop: 10, color: "#b85454", fontSize: 14}}>
-              Не удалось сохранить профиль. Проверь соединение и попробуй ещё раз.
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -797,7 +790,7 @@ function PageLearn({ course, accent, openLesson }) {
 
     return (
       <div>
-        <PageHeader title="Материалы курса" sub="Программа курса · SES" accent={accent} />
+        <PageHeader title="Обучение" sub="Программа курса · SES" accent={accent} />
 
         {!selectedFaculty ? (
           <div className="ses-faculty-grid">
@@ -843,7 +836,7 @@ function PageLearn({ course, accent, openLesson }) {
 
   return (
     <div>
-      <PageHeader title="Материалы курса" sub={`Программа курса · ${course.toUpperCase()}`} accent={accent} />
+      <PageHeader title="Обучение" sub={`Программа курса · ${course.toUpperCase()}`} accent={accent} />
 
       <div className="learn-entry-grid">
         <button className="learn-entry-card" type="button" onClick={openTopics}>
@@ -892,61 +885,79 @@ function PageLearn({ course, accent, openLesson }) {
 }
 
 // ============ ОБ ЭКЗАМЕНЕ ============
-function PageExam({ accent }) {
-  const cards = [
-    {
-      tag: "ОГЭ",
-      title: "9 класс",
-      meta: "24 задания",
-      text: "Две части: задания с кратким ответом и развёрнутые решения. Основной фокус — базовые понятия, реакции и расчёты.",
+function PageExam({ course, accent }) {
+  const data = {
+    oge: {
+      title: "Об экзамене · ОГЭ",
+      sub: "ЕГЭ для 9 класса · вариант + теория",
+      variants: [
+        { n: 1, name: "Демо-вариант 2026" },
+        { n: 2, name: "Открытый банк ФИПИ" },
+        { n: 3, name: "Тренировочный №3" },
+      ],
+      sections: [
+        { tag: "Часть 1", title: "Задания с кратким ответом", count: "1–19" },
+        { tag: "Часть 2", title: "Задания с развёрнутым ответом", count: "20–24" },
+      ],
     },
-    {
-      tag: "ЕГЭ",
-      title: "11 класс",
-      meta: "34 задания",
-      text: "Проверяются неорганика, органика, расчётные задачи и развёрнутые ответы с критериями оценивания.",
+    ege: {
+      title: "Об экзамене · ЕГЭ",
+      sub: "вариант для 11 класса · теория",
+      variants: [
+        { n: 1, name: "Демо-вариант 2026" },
+        { n: 2, name: "Досрочный вариант" },
+        { n: 3, name: "Сборник Добротина" },
+      ],
+      sections: [
+        { tag: "Часть 1", title: "Задания с кратким ответом", count: "1–28" },
+        { tag: "Часть 2", title: "Задания с развёрнутым ответом", count: "29–34" },
+      ],
     },
-    {
-      tag: "СЕССИЯ",
-      title: "Вуз",
-      meta: "зачёты и билеты",
-      text: "Материал зависит от факультета: общая, неорганическая, органическая химия и профильные медицинские темы.",
+    ses: {
+      title: "Об экзамене · Сессия",
+      sub: "химия для медицинских и фарм. специальностей",
+      variants: [
+        { n: 1, name: "Лечебный, педиатрический ф-т" },
+        { n: 2, name: "Стоматологический ф-т" },
+        { n: 3, name: "Фармацевтический ф-т" },
+      ],
+      sections: [
+        { tag: "Билет I", title: "Общая и неорганическая химия", count: "1–25" },
+        { tag: "Билет II", title: "Биохимия", count: "26–50" },
+      ],
     },
-  ];
-
-  const sections = [
-    { tag: "1", title: "Сначала разбираем структуру", count: "формат, баллы, критерии" },
-    { tag: "2", title: "Потом закрываем теорию", count: "темы без привязки к вкладкам" },
-    { tag: "3", title: "После этого тренируем задания", count: "варианты, тесты, разборы" },
-  ];
+  }[course];
 
   return (
     <div>
-      <PageHeader title="Об экзамене" sub="Статичная памятка по формату и подготовке" accent={accent} />
+      <PageHeader title={data.title} sub={data.sub} accent={accent} />
 
       <div style={{fontSize: 16, color: "var(--ink-soft)", marginBottom: 10}}>
-        основные форматы:
+        варианты:
       </div>
-      <div className="variant-grid exam-static-grid">
-        {cards.map(c => (
-          <div key={c.tag} className="variant-card exam-info-card">
-            <span className="v-tag" style={{background: accent.d}}>{c.tag}</span>
-            <div className="v-num">{c.title}</div>
-            <div className="v-name">{c.meta}</div>
-            <p className="exam-card-text">{c.text}</p>
+      <div className="variant-grid">
+        {data.variants.map(v => (
+          <div key={v.n} className="variant-card">
+            <span className="v-tag" style={{background: accent.d}}>В{v.n}</span>
+            <div className="v-num">Вариант {v.n}</div>
+            <div className="v-name">{v.name}</div>
+            <div className="v-actions">
+              <button className="btn btn--filled">Открыть</button>
+              <button className="btn btn--ghost">Скачать PDF</button>
+            </div>
           </div>
         ))}
       </div>
 
       <div style={{fontSize: 16, color: "var(--ink-soft)", margin: "24px 0 10px"}}>
-        как готовиться:
+        структура экзамена:
       </div>
       <div className="stack">
-        {sections.map((s, i) => (
+        {data.sections.map((s, i) => (
           <div key={i} className="topic" style={{"--accent-soft": accent.soft, "--accent-d": accent.d}}>
-            <span className="t-num">{s.tag}</span>
+            <span className="t-num">{s.tag.split(" ")[1] || s.tag[0]}</span>
             <span className="t-title">{s.title}</span>
-            <span className="t-meta">{s.count}</span>
+            <span className="t-meta">задания {s.count}</span>
             <span className="t-status todo">→</span>
           </div>
         ))}
@@ -1076,7 +1087,7 @@ function PageAbout({ accent }) {
 // ============ ПОМОЩЬ ============
 function PageHelp({ accent }) {
   const items = [
-    { q: "Как оплатить подписку?", a: "Открой раздел «Подписка» в правом верхнем углу. Принимаем карты РФ, СБП и иностранные карты." },
+    { q: "Как оплатить подписку?", a: "Открой раздел «Обучение · Оплата» в правом верхнем углу. Принимаем карты РФ, СБП и иностранные карты." },
     { q: "Что делать, если пропустил вебинар?", a: "Запись появляется в течение суток в разделе «Расписание». Кликни по карточке вебинара — откроется страница записи." },
     { q: "Когда проверят домашку?", a: "На подписке Light — общая проверка по ответам, на PRO куратор проверяет вручную в течение 48 часов." },
     { q: "Можно ли сменить курс ОГЭ → ЕГЭ?", a: "Да, напиши в чат поддержки. Если осталось время на подписке — переведём остаток дней на новый курс." },

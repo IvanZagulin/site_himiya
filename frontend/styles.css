@@ -249,12 +249,6 @@ input, select, textarea { font-family: var(--font-body); color: inherit; }
   transition: border-top-color 480ms ease;
 }
 .folder-body > * { min-width: 0; }
-.folder-body--home {
-  grid-template-columns: minmax(0, 1fr);
-}
-.folder-body--home .paper {
-  min-height: 720px;
-}
 .folder-body::before {
   content: "";
   position: absolute;
@@ -979,19 +973,6 @@ input, select, textarea { font-family: var(--font-body); color: inherit; }
 }
 .variant-card .v-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 .variant-card .v-actions .btn { width: 100%; padding: 10px 14px; font-size: 12px; letter-spacing: 0.05em; white-space: nowrap; }
-.exam-info-card {
-  cursor: default;
-}
-.exam-info-card:hover {
-  transform: none;
-  box-shadow: none;
-}
-.exam-card-text {
-  margin: 14px 0 0;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.55;
-}
 
 /* ====== Pricing ====== */
 .price-grid {
@@ -1687,7 +1668,6 @@ input, select, textarea { font-family: var(--font-body); color: inherit; }
   .index-item.active::after { display: none; }
   .index-item.active::before { display: none; }
   .paper { padding: 24px 20px 36px; }
-  .folder-body--home .paper { min-height: auto; }
   .paper::before, .paper::after { display: none; }
   .lesson-body { grid-template-columns: 1fr; gap: 20px; }
   .lesson-side { order: -1; }

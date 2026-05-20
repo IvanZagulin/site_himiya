@@ -61,49 +61,13 @@ const SECTIONS = [
   { id: "profile",  label: "Мой профиль",         num: "2" },
   { id: "schedule", label: "Расписание вебинаров", num: "6" },
   { id: "rating",   label: "Мой прогресс",         num: "4" },
+  { id: "learn",    label: "Обучение",             num: "" },
   { id: "pay",      label: "Подписка",             num: "3" },
   { id: "exam",     label: "Об экзамене",          num: "5" },
   { id: "invite",   label: "Пригласи друга",       num: "" },
   { id: "about",    label: "О нас",                num: "" },
   { id: "help",     label: "Помощь",               num: "1" },
 ];
-
-const DEFAULT_PROFILE = {
-  firstName: '',
-  lastName: '',
-  dob: '',
-  grade: '11 класс',
-  studyType: 'school',
-  subscription: 'none',
-  invited: 0,
-  photo: null,
-};
-
-function profileFromApi(d) {
-  return {
-    ...DEFAULT_PROFILE,
-    firstName: d.firstName || '',
-    lastName: d.lastName || '',
-    dob: d.dob || '',
-    grade: d.grade || '11 класс',
-    studyType: d.studyType || 'school',
-    subscription: d.subscription || 'none',
-    invited: d.invitedCount || 0,
-    photo: d.photoUrl || null,
-  };
-}
-
-function profileToPayload(p) {
-  return {
-    firstName: p.firstName || '',
-    lastName: p.lastName || '',
-    dob: p.dob || '',
-    grade: p.grade || '',
-    studyType: p.studyType || 'school',
-    subscription: p.subscription || 'none',
-    photoUrl: p.photo || null,
-  };
-}
 
 function AuthScreen({ onLogin, onClose, initialMode }) {
   const [mode, setMode] = React.useState(initialMode || 'login');
@@ -243,76 +207,33 @@ function App() {
   const openRegister = () => { setAuthInitMode('register'); setShowAuth(true); };
 
   // ── Profile state (backend-stored) ──────────────────────────────
+  const DEFAULT_PROFILE = { firstName: '', lastName: '', dob: '', grade: '11 класс', subscription: 'none', invited: 0, photo: null };
   const [profile, setProfile] = React.useState(DEFAULT_PROFILE);
-  const [profileReady, setProfileReady] = React.useState(false);
   const [profileSaved, setProfileSaved] = React.useState(false);
-  const [profileSaving, setProfileSaving] = React.useState(false);
-  const [profileSaveError, setProfileSaveError] = React.useState(false);
   const saveTimerRef = React.useRef(null);
-  const savedNoticeTimerRef = React.useRef(null);
-  const lastSavedProfileRef = React.useRef(null);
-
-  const showProfileSaved = () => {
-    clearTimeout(savedNoticeTimerRef.current);
-    setProfileSaved(true);
-    savedNoticeTimerRef.current = setTimeout(() => setProfileSaved(false), 2000);
-  };
-
-  const saveProfileNow = React.useCallback((nextProfile = profile) => {
-    if (!currentUser) return Promise.resolve();
-    const payload = profileToPayload(nextProfile);
-    setProfileSaving(true);
-    setProfileSaveError(false);
-    return apiFetch('/api/profile/', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-      .then(r => {
-        if (!r.ok) throw new Error('profile save failed');
-        lastSavedProfileRef.current = JSON.stringify(payload);
-        showProfileSaved();
-        return r.json();
-      })
-      .catch(() => setProfileSaveError(true))
-      .finally(() => setProfileSaving(false));
-  }, [currentUser, profile]);
 
   // Load profile from API when user changes
   React.useEffect(() => {
-    let cancelled = false;
-    clearTimeout(saveTimerRef.current);
-    setProfileSaved(false);
-    setProfileSaveError(false);
-    if (!currentUser) {
-      setProfile(DEFAULT_PROFILE);
-      setProfileReady(false);
-      lastSavedProfileRef.current = null;
-      return () => { cancelled = true; };
-    }
-    setProfileReady(false);
-    apiFetch('/api/profile/')
+    if (!currentUser) { setProfile(DEFAULT_PROFILE); return; }
+    apiFetch('/api/profile')
       .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (cancelled) return;
-        const nextProfile = d ? profileFromApi(d) : DEFAULT_PROFILE;
-        lastSavedProfileRef.current = JSON.stringify(profileToPayload(nextProfile));
-        setProfile(nextProfile);
-        setProfileReady(true);
-      })
-      .catch(() => { if (!cancelled) setProfileReady(true); });
-    return () => { cancelled = true; };
+      .then(d => { if (d) setProfile({ firstName: d.firstName || '', lastName: d.lastName || '', dob: d.dob || '', grade: d.grade || '11 класс', subscription: d.subscription || 'none', invited: d.invitedCount || 0, photo: d.photoUrl || null }); })
+      .catch(() => {});
   }, [currentUser]);
 
   // Auto-save profile to API with debounce (1.5s after last change)
   React.useEffect(() => {
-    if (!currentUser || !profileReady) return;
-    const payload = profileToPayload(profile);
-    if (JSON.stringify(payload) === lastSavedProfileRef.current) return;
+    if (!currentUser) return;
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => saveProfileNow(profile), 1200);
+    saveTimerRef.current = setTimeout(() => {
+      apiFetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName: profile.firstName, lastName: profile.lastName, dob: profile.dob, grade: profile.grade, subscription: profile.subscription }),
+      }).then(r => { if (r.ok) { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2000); } }).catch(() => {});
+    }, 1500);
     return () => clearTimeout(saveTimerRef.current);
-  }, [profile, currentUser, profileReady, saveProfileNow]);
+  }, [profile, currentUser]);
 
   // ── Check auth on mount via cookie ──────────────────────────────
   React.useEffect(() => {
@@ -328,8 +249,6 @@ function App() {
     apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setCurrentUser(null);
     setProfile(DEFAULT_PROFILE);
-    setProfileReady(false);
-    lastSavedProfileRef.current = null;
   };
 
   // Read hash on mount + listen for browser back/forward
@@ -408,18 +327,7 @@ function App() {
       setSection={(s)=>{setSection(s); setLesson(null);}} accent={accent} />;
   } else if (section === "profile") {
     body = currentUser
-      ? <PageProfile
-          profile={profile}
-          setProfile={setProfile}
-          course={course}
-          accent={accent}
-          onLogout={doLogout}
-          onSave={() => saveProfileNow(profile)}
-          ready={profileReady}
-          saving={profileSaving}
-          saved={profileSaved}
-          saveError={profileSaveError}
-        />
+      ? <PageProfile profile={profile} setProfile={setProfile} course={course} accent={accent} onLogout={doLogout} />
       : <AuthRequired onLogin={openLogin} accent={accent} />;
   } else if (section === "schedule") {
     body = <PageSchedule course={course} accent={accent} openLesson={openLesson} />;
@@ -433,7 +341,7 @@ function App() {
   } else if (section === "pay") {
     body = <PagePay profile={profile} setProfile={setProfile} accent={accent} currentUser={currentUser} onLoginRequired={openLogin} />;
   } else if (section === "exam") {
-    body = <PageExam accent={accent} />;
+    body = <PageExam course={course === "main" ? "ege" : course} accent={accent} />;
   } else if (section === "invite") {
     body = currentUser
       ? <PageInvite profile={profile} setProfile={setProfile} accent={accent} />
@@ -443,8 +351,6 @@ function App() {
   } else if (section === "help") {
     body = <PageHelp accent={accent} />;
   }
-
-  const isHomeScreen = course === "main" && section === "home" && !lesson;
 
   return (
     <div className="app">
@@ -495,31 +401,29 @@ function App() {
           ))}
         </div>
 
-        <div className={`folder-body ${isHomeScreen ? "folder-body--home" : ""} ${flipping ? "flipping" : ""}`}
+        <div className={`folder-body ${flipping ? "flipping" : ""}`}
              style={{"--accent": accent.c, "--accent-d": accent.d}}>
-          {!isHomeScreen && (
-            <nav className="index">
+          <nav className="index">
+            <IndexItem
+              num=""
+              label="Главная"
+              active={course === "main" && section === "home" && !lesson}
+              onClick={() => { setCourse("main"); setSection("home"); setLesson(null); }}
+            />
+            {SECTIONS.map(s => (
               <IndexItem
-                num=""
-                label="Главная"
-                active={course === "main" && section === "home" && !lesson}
-                onClick={() => { setCourse("main"); setSection("home"); setLesson(null); }}
+                key={s.id}
+                num={s.num}
+                label={s.label}
+                active={section === s.id && !lesson}
+                onClick={() => onSectionClick(s.id)}
               />
-              {SECTIONS.map(s => (
-                <IndexItem
-                  key={s.id}
-                  num={s.num}
-                  label={s.label}
-                  active={section === s.id && !lesson}
-                  onClick={() => onSectionClick(s.id)}
-                />
-              ))}
-              <div className="index-foot">
-                стр. 1/3 · 15л<br/>
-                <span style={{fontSize: 14}}>с нуля. ©2026</span>
-              </div>
-            </nav>
-          )}
+            ))}
+            <div className="index-foot">
+              стр. 1/3 · 15л<br/>
+              <span style={{fontSize: 14}}>с нуля. ©2026</span>
+            </div>
+          </nav>
 
           <main className="paper" key={flipKey}>
             <ErrorBoundary>

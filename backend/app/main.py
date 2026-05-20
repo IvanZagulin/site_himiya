@@ -6,7 +6,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from passlib.context import CryptContext
-from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -34,31 +33,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds
 
 def _create_tables():
     Base.metadata.create_all(bind=engine)
-
-
-def _ensure_user_profile_columns():
-    statements = [
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS dob VARCHAR(20)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS grade VARCHAR(50) DEFAULT '11 класс'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS study_type VARCHAR(20) DEFAULT 'school'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription VARCHAR(20) DEFAULT 'none'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_count INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT",
-    ]
-    if engine.dialect.name == "postgresql":
-        with engine.begin() as conn:
-            for statement in statements:
-                conn.execute(text(statement))
-        return
-
-    columns = {c["name"] for c in inspect(engine).get_columns("users")}
-    with engine.begin() as conn:
-        for statement in statements:
-            name = statement.split(" IF NOT EXISTS ")[1].split()[0]
-            if name not in columns:
-                conn.execute(text(statement.replace(" IF NOT EXISTS", "")))
 
 
 def _ensure_admin():
@@ -111,7 +85,6 @@ def _ensure_topics():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _create_tables()
-    _ensure_user_profile_columns()
     _ensure_admin()
     _ensure_topics()
     os.makedirs(settings.MEDIA_DIR, exist_ok=True)

@@ -29,7 +29,6 @@ class User(Base):
     last_name     = Column(String(100), nullable=True)
     dob           = Column(String(20),  nullable=True)
     grade         = Column(String(50),  nullable=True, default='11 класс')
-    study_type    = Column(String(20),  nullable=True, default='school')
     subscription  = Column(String(20),  nullable=True, default='none')
     invited_count = Column(Integer, default=0, nullable=False)
     photo_url     = Column(Text, nullable=True)
