@@ -528,12 +528,13 @@ async function loadUsers() {
       <td><span class="badge ${u.is_admin?'badge-blue':'badge-gray'}">${u.is_admin?'Админ':'Юзер'}</span></td>
       <td><span class="badge ${u.is_active?'badge-green':'badge-gray'}">${u.is_active?'Да':'Нет'}</span></td>
       <td>${fmtDate(u.created_at)}</td>
-      <td><button class="btn btn-sm btn-secondary" onclick="toggleUser(${u.id},${u.is_active})">${u.is_active?'Блок':'Разблок'}</button></td>
+      <td>${u.is_admin ? '<span class="badge badge-gray">Нельзя</span>' : `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Удалить</button>`}</td>
     </tr>`).join('');
 }
 
-async function toggleUser(id,active){
-  await apiFetch('/admin/users/'+id+'?is_active='+(!active),{method:'PATCH'});
+async function deleteUser(id){
+  if (!confirm('Удалить пользователя с сайта? Это действие нельзя отменить.')) return;
+  await apiFetch('/admin/users/'+id,{method:'DELETE'});
   loadUsers();
 }
 
@@ -703,6 +704,11 @@ function renderContentPanel(idx, title, vList, dList, qList, sList) {
         <div class="lp-upload-box">
           <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Загрузить видео</div>
           <input id="lp-vtitle-${idx}" type="text" placeholder="Название" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:6px;font-family:inherit;outline:none;" />
+          ${_topicCourse === 'ses' ? `
+          <select id="lp-vfaculty-${idx}" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:6px;font-family:inherit;outline:none;">
+            <option value="medical">Лечебно-педиатрический факультет</option>
+            <option value="dental">Стоматологический факультет</option>
+          </select>` : ''}
           <div id="lp-vdrop-${idx}" class="lp-drop-zone"
                ondragover="event.preventDefault();this.classList.add('drag')"
                ondragleave="this.classList.remove('drag')"
@@ -848,14 +854,25 @@ function selectTopicCourse(course, btn) {
 
 function buildLpVideos(videos, idx) {
   if (!videos.length) return '<div class="lp-empty">Нет видео</div>';
-  return videos.map(v => `
-    <div class="lp-item">
-      <div style="flex:1;min-width:0;">
-        <div class="lp-item-name" title="${v.title}">${v.title}</div>
-        <div class="lp-item-meta">${fmtSize(v.size_bytes)} · <span class="badge ${v.is_active?'badge-green':'badge-gray'}" style="font-size:11px;">${v.is_active?'Активно':'Скрыто'}</span></div>
+  return videos.map(v => {
+    const thumbHtml = v.thumbnail
+      ? `<img src="/media/videos/${v.thumbnail}" style="width:56px;height:36px;object-fit:cover;border-radius:5px;border:1.5px solid var(--border);flex-shrink:0;">`
+      : '<div style="width:56px;height:36px;background:var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">▶</div>';
+    return `<div class="lp-item" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${thumbHtml}
+        <div style="flex:1;min-width:0;">
+          <div class="lp-item-name" title="${escapeHtml(v.title)}">${escapeHtml(v.title)}</div>
+          <div class="lp-item-meta">${fmtSize(v.size_bytes)} · <span class="badge ${v.is_active?'badge-green':'badge-gray'}" style="font-size:11px;">${v.is_active?'Активно':'Скрыто'}</span></div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="lpDeleteVideo(${v.id},${idx})">✕</button>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="lpDeleteVideo(${v.id},${idx})">✕</button>
-    </div>`).join('');
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:11px;color:var(--muted);flex-shrink:0;">Заставка:</label>
+        <input type="file" accept="image/*" style="font-size:11px;flex:1;" onchange="lpUploadThumbnail(event,${v.id},${idx})">
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function buildLpDocs(docs, idx) {
@@ -894,12 +911,27 @@ const WEEKDAY_LABELS = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
 function buildLpSchedule(events, idx) {
   if (!events || !events.length) return '<div class="lp-empty">В календаре пока нет</div>';
   return events.map(ev => `
-    <div class="lp-item">
-      <div style="flex:1;min-width:0;">
-        <div class="lp-item-name">${WEEKDAY_LABELS[ev.weekday] || '—'} · ${ev.start_time}–${ev.end_time} · ${escapeHtml(ev.title)}</div>
-        <div class="lp-item-meta">Переход ведёт на урок ${ev.lesson_idx}: ${escapeHtml(ev.topic)}</div>
+    <div class="lp-item" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge ${ev.is_active ? 'badge-green' : 'badge-gray'}" style="font-size:11px;flex-shrink:0;">${ev.is_active ? 'Вкл' : 'Выкл'}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="lp-item-name">${WEEKDAY_LABELS[ev.weekday] || '—'} · ${ev.start_time}–${ev.end_time} · ${escapeHtml(ev.title)}</div>
+          <div class="lp-item-meta">${escapeHtml(ev.topic)}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="lpToggleScheduleActive(${ev.id}, ${ev.is_active}, ${idx})">${ev.is_active ? 'Скрыть' : 'Показать'}</button>
+        <button class="btn btn-danger btn-sm" onclick="lpDeleteSchedule(${ev.id},${idx})">✕</button>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="lpDeleteSchedule(${ev.id},${idx})">✕</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;">
+        <select style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-family:inherit;" id="lp-sedit-day-${ev.id}">
+          ${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((d,i)=>'<option value="'+i+'"'+(i===ev.weekday?' selected':'')+'>'+d+'</option>').join('')}
+        </select>
+        <input type="time" id="lp-sedit-start-${ev.id}" value="${ev.start_time}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-family:inherit;">
+        <input type="time" id="lp-sedit-end-${ev.id}" value="${ev.end_time}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-family:inherit;">
+        <input type="text" id="lp-sedit-title-${ev.id}" value="${escapeHtml(ev.title)}" placeholder="Заголовок" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-family:inherit;">
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary btn-sm" onclick="lpEditSchedule(${ev.id}, ${idx})" style="font-size:11px;">Сохранить изменения</button>
+      </div>
     </div>`).join('');
 }
 
@@ -926,6 +958,64 @@ async function lpAddSchedule(idx) {
     let msg = 'Не удалось добавить';
     try { const err = res ? await res.json() : null; if (err && err.detail) msg = err.detail; } catch(e) {}
     alertEl.textContent = msg; alertEl.style.color = '#c62828';
+  }
+}
+
+
+async function lpUploadThumbnail(event, videoId, idx) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch('/api/admin/videos/' + videoId + '/thumbnail', {
+    method: 'POST',
+    headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+    body: fd,
+  });
+  if (res && res.ok) {
+    lpReloadLesson(idx);
+  } else {
+    let msg = 'Не удалось загрузить заставку';
+    try { const e = await res.json(); if (e.detail) msg = e.detail; } catch(e) {}
+    alert(msg);
+  }
+}
+
+async function lpToggleScheduleActive(eventId, isActive, idx) {
+  const res = await apiFetch('/admin/schedule/' + eventId, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: !isActive }),
+  });
+  if (res && res.ok) {
+    lpReloadLesson(idx);
+  } else {
+    alert('Не удалось изменить статус');
+  }
+}
+
+async function lpEditSchedule(eventId, idx) {
+  const dayEl = document.getElementById('lp-sedit-day-' + eventId);
+  const startEl = document.getElementById('lp-sedit-start-' + eventId);
+  const endEl = document.getElementById('lp-sedit-end-' + eventId);
+  const titleEl = document.getElementById('lp-sedit-title-' + eventId);
+  if (!dayEl || !startEl || !endEl || !titleEl) return;
+  const payload = {
+    weekday: parseInt(dayEl.value, 10),
+    start_time: startEl.value,
+    end_time: endEl.value,
+    title: titleEl.value.trim(),
+  };
+  const res = await apiFetch('/admin/schedule/' + eventId, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  if (res && res.ok) {
+    lpReloadLesson(idx);
+  } else {
+    let msg = 'Не удалось сохранить';
+    try { const e = res ? await res.json() : null; if (e && e.detail) msg = e.detail; } catch(e) {}
+    alert(msg);
   }
 }
 
@@ -988,6 +1078,8 @@ async function lpUploadVideo(idx) {
   const fd = new FormData();
   fd.append('title', title);
   fd.append('course', _topicCourse);
+  const facultyEl = document.getElementById('lp-vfaculty-'+idx);
+  if (facultyEl) fd.append('faculty', facultyEl.value);
   fd.append('lesson_idx', idx);
   fd.append('file', file);
 

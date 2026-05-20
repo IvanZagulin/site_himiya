@@ -217,6 +217,7 @@ async def upload_video(
     background_tasks: BackgroundTasks,
     title: str = Form(...),
     course: str = Form("main"),
+    faculty: Optional[str] = Form(None),
     description: str = Form(""),
     lesson_idx: Optional[int] = Form(None),
     file: UploadFile = File(...),
@@ -235,8 +236,13 @@ async def upload_video(
     with open(path, "wb") as f:
         f.write(content)
     size_bytes = os.path.getsize(path)
+    if course != "ses":
+        faculty = None
+    elif faculty not in {"medical", "dental"}:
+        raise HTTPException(400, "Faculty is required for session videos")
     video = Video(title=title, description=description or None,
                   filename=filename, course=course,
+                  faculty=faculty,
                   lesson_idx=lesson_idx, size_bytes=size_bytes)
     db.add(video); db.commit(); db.refresh(video)
     background_tasks.add_task(_prepare_uploaded_video, path)
@@ -268,6 +274,43 @@ def delete_video(video_id: int,
     if os.path.exists(hls_dir): shutil.rmtree(hls_dir)
     db.delete(video); db.commit()
     return {"message": "Удалено"}
+
+
+
+
+ALLOWED_IMAGE = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+@router.post("/videos/{video_id}/thumbnail")
+async def upload_thumbnail(
+    video_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    if file.content_type not in ALLOWED_IMAGE:
+        raise HTTPException(400, "Только изображения (jpeg, png, webp, gif)")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(413, "Файл слишком большой. Максимум 10 МБ")
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(404, "Видео не найдено")
+    ext = os.path.splitext(file.filename or "thumb.jpg")[1].lower() or ".jpg"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        ext = ".jpg"
+    filename = "thumb_" + uuid.uuid4().hex + ext
+    os.makedirs(settings.MEDIA_DIR, exist_ok=True)
+    with open(os.path.join(settings.MEDIA_DIR, filename), "wb") as f:
+        f.write(content)
+    # Remove old thumbnail if exists
+    if video.thumbnail:
+        old_path = os.path.join(settings.MEDIA_DIR, video.thumbnail)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    video.thumbnail = filename
+    db.commit()
+    return {"thumbnail": filename}
 
 
 # ─── Documents ─────────────────────────────────────────────────────────────
@@ -416,6 +459,22 @@ def update_user(user_id: int,
     if is_admin  is not None: user.is_admin  = is_admin
     db.commit()
     return {"message": "Обновлено"}
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int,
+                db: Session = Depends(get_db),
+                admin: User = Depends(get_admin_user)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    if user.id == admin.id:
+        raise HTTPException(400, "Cannot delete current admin")
+    if user.is_admin:
+        raise HTTPException(400, "Cannot delete admin user")
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted"}
+
 
 from app.models.topic import Topic
 
@@ -596,3 +655,39 @@ def delete_schedule_event(
     if not ev:
         raise HTTPException(404, "Не найдено")
     db.delete(ev); db.commit()
+
+@router.patch("/schedule/{event_id}")
+def update_schedule_event(
+    event_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    ev = db.query(ScheduleEvent).filter(ScheduleEvent.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Не найдено")
+    updates = {}
+    if "weekday" in data:
+        wd = int(data["weekday"])
+        if wd not in WEEKDAYS:
+            raise HTTPException(400, "Некорректный день недели")
+        updates["weekday"] = wd
+    if "start_time" in data:
+        updates["start_time"] = _normalize_time(data["start_time"])
+    if "end_time" in data:
+        updates["end_time"] = _normalize_time(data["end_time"])
+    if "title" in data and str(data["title"]).strip():
+        updates["title"] = str(data["title"]).strip()
+    if "topic" in data and str(data["topic"]).strip():
+        updates["topic"] = str(data["topic"]).strip()
+    if "is_active" in data:
+        updates["is_active"] = bool(data["is_active"])
+    if updates:
+        st = updates.get("start_time", ev.start_time)
+        et = updates.get("end_time", ev.end_time)
+        if et <= st:
+            raise HTTPException(400, "Конец занятия должен быть позже начала")
+        db.query(ScheduleEvent).filter(ScheduleEvent.id == event_id).update(updates, synchronize_session=False)
+        db.commit()
+    ev = db.query(ScheduleEvent).filter(ScheduleEvent.id == event_id).first()
+    return schedule_event_out(ev)

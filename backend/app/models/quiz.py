@@ -38,6 +38,15 @@ class QuizAttempt(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class LessonView(Base):
+    __tablename__ = "lesson_views"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course     = Column(String(50), nullable=False)
+    lesson_idx = Column(Integer, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class LessonDoc(Base):
     __tablename__ = "lesson_docs"
     id          = Column(Integer, primary_key=True)

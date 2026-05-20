@@ -15,7 +15,9 @@ class ProfileUpdate(BaseModel):
     lastName:  Optional[str] = None
     dob:       Optional[str] = None
     grade:     Optional[str] = None
+    studyType: Optional[str] = None
     subscription: Optional[str] = None
+    photoUrl: Optional[str] = None
 
 
 class ProfileOut(BaseModel):
@@ -23,6 +25,7 @@ class ProfileOut(BaseModel):
     lastName:     Optional[str] = None
     dob:          Optional[str] = None
     grade:        str = '11 класс'
+    studyType:    str = 'school'
     subscription: str = 'none'
     invitedCount: int = 0
     photoUrl:     Optional[str] = None
@@ -34,6 +37,7 @@ def _to_out(user: User) -> ProfileOut:
         lastName=user.last_name,
         dob=user.dob,
         grade=user.grade or '11 класс',
+        studyType=user.study_type or 'school',
         subscription=user.subscription or 'none',
         invitedCount=user.invited_count or 0,
         photoUrl=user.photo_url,
@@ -55,6 +59,9 @@ def update_profile(
     if data.lastName    is not None: user.last_name    = data.lastName
     if data.dob         is not None: user.dob          = data.dob
     if data.grade       is not None: user.grade        = data.grade
+    if data.studyType in {'school', 'student'}:
+        user.study_type = data.studyType
+    if data.photoUrl    is not None: user.photo_url    = data.photoUrl
     if data.subscription is not None:
         allowed = {'none', 'light', 'pro'}
         if data.subscription in allowed:
