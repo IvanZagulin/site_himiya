@@ -247,6 +247,23 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
     else { v.pause(); }
   }, []);
 
+  const seekBy = (delta, e) => {
+    if (e) e.stopPropagation();
+    const v = videoRef.current; if (!v) return;
+    const next = Math.max(0, Math.min(v.duration || Infinity, (v.currentTime || 0) + delta));
+    v.currentTime = next;
+    setCurrentTime(next);
+  };
+
+  const changeVolumeBy = (delta) => {
+    const v = videoRef.current; if (!v) return;
+    const next = Math.max(0, Math.min(1, (muted ? 0 : volume) + delta));
+    v.volume = next;
+    v.muted = false;
+    setMuted(false);
+    setVolume(next);
+  };
+
   const seek = e => {
     const bar = progressRef.current; const v = videoRef.current;
     if (!bar || !v || !duration) return;
@@ -353,6 +370,29 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
     else { clearTimeout(hideTimer.current); setShowControls(true); }
   }, [playing]);
 
+  React.useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target && e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || (e.target && e.target.isContentEditable)) return;
+      const v = videoRef.current; if (!v) return;
+      if (e.code === "Space" || e.key === " ") { e.preventDefault(); togglePlay(); resetHide(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); seekBy(-10); resetHide(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); seekBy(10); resetHide(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); changeVolumeBy(0.05); resetHide(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); changeVolumeBy(-0.05); resetHide(); }
+      else if (e.key.toLowerCase() === "m") { e.preventDefault(); v.muted = !v.muted; setMuted(v.muted); resetHide(); }
+      else if (e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        const wrap = wrapRef.current;
+        if (!document.fullscreenElement && wrap && wrap.requestFullscreen) wrap.requestFullscreen();
+        else if (document.exitFullscreen) document.exitFullscreen();
+        resetHide();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [togglePlay, volume, muted]);
+
   const btnBase = {
     background: "none", border: "none", color: "rgba(255,255,255,0.8)",
     cursor: "pointer", padding: "4px 6px", fontSize: 18, lineHeight: 1,
@@ -435,6 +475,13 @@ function VideoPlayer({ src: videoSrc, poster, accent, onDuration }) {
               display:"flex",alignItems:"center",justifyContent:"center",
               fontSize:14,cursor:"pointer",
             }}>{playing ? "❚❚" : "▶"}</button>
+
+          <button onClick={e=>seekBy(-10,e)} style={{...btnBase,fontSize:13,fontWeight:800}} title="Назад на 10 секунд">
+            −10
+          </button>
+          <button onClick={e=>seekBy(10,e)} style={{...btnBase,fontSize:13,fontWeight:800}} title="Вперёд на 10 секунд">
+            +10
+          </button>
 
           <button onClick={toggleMute} style={btnBase}>
             {muted||volume===0?"🔇":volume<0.5?"🔉":"🔊"}

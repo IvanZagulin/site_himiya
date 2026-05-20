@@ -59,7 +59,7 @@ function PageHome({ course, setCourse, setSection, accent, theme, setTheme }) {
           подготовку к экзамену.
         </p>
         <div className="cta-row" style={{justifyContent:'center', columnGap: '40px', rowGap: '14px'}}>
-          <button className="btn btn--filled" onClick={() => setSection("learn")}>Начать обучение</button>
+          <button className="btn btn--filled" onClick={() => setSection("learn")}>Перейти к курсу</button>
           <button className="btn" onClick={() => setSection("schedule")}>Расписание вебинаров</button>
         </div>
       </div>
@@ -464,6 +464,23 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
     if (v.paused) v.play().catch(() => {}); else v.pause();
   };
 
+  const seekBy = (delta, e) => {
+    if (e) e.stopPropagation();
+    const v = videoRef.current; if (!v) return;
+    const next = Math.max(0, Math.min(v.duration || Infinity, (v.currentTime || 0) + delta));
+    v.currentTime = next;
+    setCurrentTime(next);
+  };
+
+  const changeVolumeBy = (delta) => {
+    const v = videoRef.current; if (!v) return;
+    const next = Math.max(0, Math.min(1, (muted ? 0 : volume) + delta));
+    v.volume = next;
+    v.muted = false;
+    setMuted(false);
+    setVolume(next);
+  };
+
   const seek = e => {
     const bar = progressRef.current; const v = videoRef.current;
     if (!bar || !v || !duration) return;
@@ -551,6 +568,28 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
     return () => document.removeEventListener("fullscreenchange", onFS);
   }, []);
 
+  React.useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target && e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || (e.target && e.target.isContentEditable)) return;
+      const v = videoRef.current; if (!v) return;
+      if (e.code === "Space" || e.key === " ") { e.preventDefault(); togglePlay(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); seekBy(-10); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); seekBy(10); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); changeVolumeBy(0.05); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); changeVolumeBy(-0.05); }
+      else if (e.key.toLowerCase() === "m") { e.preventDefault(); v.muted = !v.muted; setMuted(v.muted); }
+      else if (e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        const wrap = wrapRef.current;
+        if (!document.fullscreenElement && wrap && wrap.requestFullscreen) wrap.requestFullscreen();
+        else if (document.exitFullscreen) document.exitFullscreen();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [volume, muted]);
+
   const btnBase = {
     background:"none",border:"none",color:"rgba(255,255,255,0.8)",
     cursor:"pointer",padding:"3px 5px",fontSize:16,lineHeight:1,
@@ -619,6 +658,13 @@ function VideoPlayerInline({ src: videoSrc, poster, accent }) {
               display:"flex",alignItems:"center",justifyContent:"center",
               fontSize:12,cursor:"pointer",
             }}>{playing ? "❚❚" : "▶"}</button>
+
+          <button onClick={e=>seekBy(-10,e)} style={{...btnBase,fontSize:11,fontWeight:800}} title="Назад на 10 секунд">
+            −10
+          </button>
+          <button onClick={e=>seekBy(10,e)} style={{...btnBase,fontSize:11,fontWeight:800}} title="Вперёд на 10 секунд">
+            +10
+          </button>
 
           <button onClick={toggleMute} style={btnBase}>
             {muted||volume===0?"🔇":volume<0.5?"🔉":"🔊"}
@@ -790,7 +836,7 @@ function PageLearn({ course, accent, openLesson }) {
 
     return (
       <div>
-        <PageHeader title="Обучение" sub="Программа курса · SES" accent={accent} />
+        <PageHeader title="Материалы курса" sub="Программа курса · SES" accent={accent} />
 
         {!selectedFaculty ? (
           <div className="ses-faculty-grid">
@@ -836,7 +882,7 @@ function PageLearn({ course, accent, openLesson }) {
 
   return (
     <div>
-      <PageHeader title="Обучение" sub={`Программа курса · ${course.toUpperCase()}`} accent={accent} />
+      <PageHeader title="Материалы курса" sub={`Программа курса · ${course.toUpperCase()}`} accent={accent} />
 
       <div className="learn-entry-grid">
         <button className="learn-entry-card" type="button" onClick={openTopics}>
@@ -885,79 +931,61 @@ function PageLearn({ course, accent, openLesson }) {
 }
 
 // ============ ОБ ЭКЗАМЕНЕ ============
-function PageExam({ course, accent }) {
-  const data = {
-    oge: {
-      title: "Об экзамене · ОГЭ",
-      sub: "ЕГЭ для 9 класса · вариант + теория",
-      variants: [
-        { n: 1, name: "Демо-вариант 2026" },
-        { n: 2, name: "Открытый банк ФИПИ" },
-        { n: 3, name: "Тренировочный №3" },
-      ],
-      sections: [
-        { tag: "Часть 1", title: "Задания с кратким ответом", count: "1–19" },
-        { tag: "Часть 2", title: "Задания с развёрнутым ответом", count: "20–24" },
-      ],
+function PageExam({ accent }) {
+  const cards = [
+    {
+      tag: "ОГЭ",
+      title: "9 класс",
+      meta: "24 задания",
+      text: "Две части: задания с кратким ответом и развёрнутые решения. Основной фокус — базовые понятия, реакции и расчёты.",
     },
-    ege: {
-      title: "Об экзамене · ЕГЭ",
-      sub: "вариант для 11 класса · теория",
-      variants: [
-        { n: 1, name: "Демо-вариант 2026" },
-        { n: 2, name: "Досрочный вариант" },
-        { n: 3, name: "Сборник Добротина" },
-      ],
-      sections: [
-        { tag: "Часть 1", title: "Задания с кратким ответом", count: "1–28" },
-        { tag: "Часть 2", title: "Задания с развёрнутым ответом", count: "29–34" },
-      ],
+    {
+      tag: "ЕГЭ",
+      title: "11 класс",
+      meta: "34 задания",
+      text: "Проверяются неорганика, органика, расчётные задачи и развёрнутые ответы с критериями оценивания.",
     },
-    ses: {
-      title: "Об экзамене · Сессия",
-      sub: "химия для медицинских и фарм. специальностей",
-      variants: [
-        { n: 1, name: "Лечебный, педиатрический ф-т" },
-        { n: 2, name: "Стоматологический ф-т" },
-        { n: 3, name: "Фармацевтический ф-т" },
-      ],
-      sections: [
-        { tag: "Билет I", title: "Общая и неорганическая химия", count: "1–25" },
-        { tag: "Билет II", title: "Биохимия", count: "26–50" },
-      ],
+    {
+      tag: "СЕССИЯ",
+      title: "Вуз",
+      meta: "зачёты и билеты",
+      text: "Материал зависит от факультета: общая, неорганическая, органическая химия и профильные медицинские темы.",
     },
-  }[course];
+  ];
+
+  const sections = [
+    { tag: "1", title: "Сначала разбираем структуру", count: "формат, баллы, критерии" },
+    { tag: "2", title: "Потом закрываем теорию", count: "темы без привязки к вкладкам" },
+    { tag: "3", title: "После этого тренируем задания", count: "варианты, тесты, разборы" },
+  ];
 
   return (
     <div>
-      <PageHeader title={data.title} sub={data.sub} accent={accent} />
+      <PageHeader title="Об экзамене" sub="Статичная памятка по формату и подготовке" accent={accent} />
 
       <div style={{fontSize: 16, color: "var(--ink-soft)", marginBottom: 10}}>
-        варианты:
+        основные форматы:
       </div>
       <div className="variant-grid">
-        {data.variants.map(v => (
-          <div key={v.n} className="variant-card">
-            <span className="v-tag" style={{background: accent.d}}>В{v.n}</span>
-            <div className="v-num">Вариант {v.n}</div>
-            <div className="v-name">{v.name}</div>
-            <div className="v-actions">
-              <button className="btn btn--filled">Открыть</button>
-              <button className="btn btn--ghost">Скачать PDF</button>
-            </div>
+        {cards.map(c => (
+          <div key={c.tag} className="variant-card">
+            <span className="v-tag" style={{background: accent.d}}>{c.tag}</span>
+            <div className="v-num">{c.title}</div>
+            <div className="v-name">{c.meta}</div>
+            <p style={{margin: "14px 0 0", color: "var(--ink)", fontSize: 14, lineHeight: 1.55}}>{c.text}</p>
           </div>
         ))}
       </div>
 
       <div style={{fontSize: 16, color: "var(--ink-soft)", margin: "24px 0 10px"}}>
-        структура экзамена:
+        как готовиться:
       </div>
       <div className="stack">
-        {data.sections.map((s, i) => (
+        {sections.map((s, i) => (
           <div key={i} className="topic" style={{"--accent-soft": accent.soft, "--accent-d": accent.d}}>
-            <span className="t-num">{s.tag.split(" ")[1] || s.tag[0]}</span>
+            <span className="t-num">{s.tag}</span>
             <span className="t-title">{s.title}</span>
-            <span className="t-meta">задания {s.count}</span>
+            <span className="t-meta">{s.count}</span>
             <span className="t-status todo">→</span>
           </div>
         ))}
@@ -1087,7 +1115,7 @@ function PageAbout({ accent }) {
 // ============ ПОМОЩЬ ============
 function PageHelp({ accent }) {
   const items = [
-    { q: "Как оплатить подписку?", a: "Открой раздел «Обучение · Оплата» в правом верхнем углу. Принимаем карты РФ, СБП и иностранные карты." },
+    { q: "Как оплатить подписку?", a: "Открой раздел «Подписка» в правом верхнем углу. Принимаем карты РФ, СБП и иностранные карты." },
     { q: "Что делать, если пропустил вебинар?", a: "Запись появляется в течение суток в разделе «Расписание». Кликни по карточке вебинара — откроется страница записи." },
     { q: "Когда проверят домашку?", a: "На подписке Light — общая проверка по ответам, на PRO куратор проверяет вручную в течение 48 часов." },
     { q: "Можно ли сменить курс ОГЭ → ЕГЭ?", a: "Да, напиши в чат поддержки. Если осталось время на подписке — переведём остаток дней на новый курс." },

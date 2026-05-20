@@ -58,16 +58,25 @@ const COURSES = [
 ];
 
 const SECTIONS = [
-  { id: "profile",  label: "Мой профиль",         num: "2" },
-  { id: "schedule", label: "Расписание вебинаров", num: "6" },
-  { id: "rating",   label: "Мой прогресс",         num: "4" },
-  { id: "learn",    label: "Обучение",             num: "" },
-  { id: "pay",      label: "Подписка",             num: "3" },
-  { id: "exam",     label: "Об экзамене",          num: "5" },
-  { id: "invite",   label: "Пригласи друга",       num: "" },
-  { id: "about",    label: "О нас",                num: "" },
-  { id: "help",     label: "Помощь",               num: "1" },
+  { id: "profile",  label: "Мой профиль" },
+  { id: "schedule", label: "Расписание вебинаров" },
+  { id: "rating",   label: "Мой прогресс" },
+  { id: "pay",      label: "Подписка" },
+  { id: "exam",     label: "Об экзамене" },
+  { id: "invite",   label: "Пригласи друга" },
+  { id: "about",    label: "О нас" },
+  { id: "help",     label: "Помощь" },
 ];
+
+function profilePayload(p) {
+  return {
+    firstName: p.firstName || '',
+    lastName: p.lastName || '',
+    dob: p.dob || '',
+    grade: p.grade || '',
+    subscription: p.subscription || 'none',
+  };
+}
 
 function AuthScreen({ onLogin, onClose, initialMode }) {
   const [mode, setMode] = React.useState(initialMode || 'login');
@@ -209,31 +218,53 @@ function App() {
   // ── Profile state (backend-stored) ──────────────────────────────
   const DEFAULT_PROFILE = { firstName: '', lastName: '', dob: '', grade: '11 класс', subscription: 'none', invited: 0, photo: null };
   const [profile, setProfile] = React.useState(DEFAULT_PROFILE);
+  const [profileReady, setProfileReady] = React.useState(false);
   const [profileSaved, setProfileSaved] = React.useState(false);
   const saveTimerRef = React.useRef(null);
+  const savedProfileRef = React.useRef(null);
 
   // Load profile from API when user changes
   React.useEffect(() => {
-    if (!currentUser) { setProfile(DEFAULT_PROFILE); return; }
+    clearTimeout(saveTimerRef.current);
+    if (!currentUser) {
+      setProfile(DEFAULT_PROFILE);
+      setProfileReady(false);
+      savedProfileRef.current = null;
+      return;
+    }
+    setProfileReady(false);
     apiFetch('/api/profile')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setProfile({ firstName: d.firstName || '', lastName: d.lastName || '', dob: d.dob || '', grade: d.grade || '11 класс', subscription: d.subscription || 'none', invited: d.invitedCount || 0, photo: d.photoUrl || null }); })
-      .catch(() => {});
+      .then(d => {
+        const next = d ? { firstName: d.firstName || '', lastName: d.lastName || '', dob: d.dob || '', grade: d.grade || '11 класс', subscription: d.subscription || 'none', invited: d.invitedCount || 0, photo: d.photoUrl || null } : DEFAULT_PROFILE;
+        setProfile(next);
+        savedProfileRef.current = JSON.stringify(profilePayload(next));
+      })
+      .catch(() => {})
+      .finally(() => setProfileReady(true));
   }, [currentUser]);
 
   // Auto-save profile to API with debounce (1.5s after last change)
   React.useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !profileReady) return;
+    const payload = profilePayload(profile);
+    if (JSON.stringify(payload) === savedProfileRef.current) return;
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       apiFetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: profile.firstName, lastName: profile.lastName, dob: profile.dob, grade: profile.grade, subscription: profile.subscription }),
-      }).then(r => { if (r.ok) { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2000); } }).catch(() => {});
+        body: JSON.stringify(payload),
+      }).then(r => {
+        if (r.ok) {
+          savedProfileRef.current = JSON.stringify(payload);
+          setProfileSaved(true);
+          setTimeout(() => setProfileSaved(false), 2000);
+        }
+      }).catch(() => {});
     }, 1500);
     return () => clearTimeout(saveTimerRef.current);
-  }, [profile, currentUser]);
+  }, [profile, currentUser, profileReady]);
 
   // ── Check auth on mount via cookie ──────────────────────────────
   React.useEffect(() => {
@@ -249,6 +280,8 @@ function App() {
     apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setCurrentUser(null);
     setProfile(DEFAULT_PROFILE);
+    setProfileReady(false);
+    savedProfileRef.current = null;
   };
 
   // Read hash on mount + listen for browser back/forward
@@ -341,7 +374,7 @@ function App() {
   } else if (section === "pay") {
     body = <PagePay profile={profile} setProfile={setProfile} accent={accent} currentUser={currentUser} onLoginRequired={openLogin} />;
   } else if (section === "exam") {
-    body = <PageExam course={course === "main" ? "ege" : course} accent={accent} />;
+    body = <PageExam accent={accent} />;
   } else if (section === "invite") {
     body = currentUser
       ? <PageInvite profile={profile} setProfile={setProfile} accent={accent} />
@@ -351,6 +384,8 @@ function App() {
   } else if (section === "help") {
     body = <PageHelp accent={accent} />;
   }
+
+  const isHomeScreen = course === "main" && section === "home" && !lesson;
 
   return (
     <div className="app">
@@ -401,29 +436,29 @@ function App() {
           ))}
         </div>
 
-        <div className={`folder-body ${flipping ? "flipping" : ""}`}
+        <div className={`folder-body ${isHomeScreen ? "folder-body--home" : ""} ${flipping ? "flipping" : ""}`}
              style={{"--accent": accent.c, "--accent-d": accent.d}}>
-          <nav className="index">
-            <IndexItem
-              num=""
-              label="Главная"
-              active={course === "main" && section === "home" && !lesson}
-              onClick={() => { setCourse("main"); setSection("home"); setLesson(null); }}
-            />
-            {SECTIONS.map(s => (
+          {!isHomeScreen && (
+            <nav className="index">
               <IndexItem
-                key={s.id}
-                num={s.num}
-                label={s.label}
-                active={section === s.id && !lesson}
-                onClick={() => onSectionClick(s.id)}
+                label="Главная"
+                active={course === "main" && section === "home" && !lesson}
+                onClick={() => { setCourse("main"); setSection("home"); setLesson(null); }}
               />
-            ))}
-            <div className="index-foot">
-              стр. 1/3 · 15л<br/>
-              <span style={{fontSize: 14}}>с нуля. ©2026</span>
-            </div>
-          </nav>
+              {SECTIONS.map(s => (
+                <IndexItem
+                  key={s.id}
+                  label={s.label}
+                  active={section === s.id && !lesson}
+                  onClick={() => onSectionClick(s.id)}
+                />
+              ))}
+              <div className="index-foot">
+                стр. 1/3 · 15л<br/>
+                <span style={{fontSize: 14}}>с нуля. ©2026</span>
+              </div>
+            </nav>
+          )}
 
           <main className="paper" key={flipKey}>
             <ErrorBoundary>
@@ -436,11 +471,10 @@ function App() {
   );
 }
 
-function IndexItem({ num, label, active, onClick }) {
+function IndexItem({ label, active, onClick }) {
   return (
     <button className={`index-item ${active ? "active" : ""}`} onClick={onClick}>
       <span style={{flex: 1}}>{label}</span>
-      <span className="num">{num}</span>
     </button>
   );
 }
